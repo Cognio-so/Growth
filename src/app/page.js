@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 import { Textarea } from '../../components/ui/textarea';
@@ -24,9 +24,11 @@ import appConfig from '../../config/app.config';
 import { Button } from '../../components/ui/button';
 import ProgressStages from '../../components/ProgressStages';
 
-
-
-export default function AISandboxPage() {
+// Create a wrapper component that uses useSearchParams
+function AISandboxPageContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  
   const [sandboxData, setSandboxData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState({ text: 'Not connected', active: false });
@@ -42,8 +44,6 @@ export default function AISandboxPage() {
   ]);
   const [aiChatInput, setAiChatInput] = useState('');
   const [aiEnabled] = useState(true);
-  const searchParams = useSearchParams();
-  const router = useRouter();
   const [aiModel, setAiModel] = useState(() => {
     const modelParam = searchParams.get('model');
     return appConfig.ai.availableModels.includes(modelParam || '') ? modelParam : appConfig.ai.defaultModel;
@@ -80,8 +80,6 @@ export default function AISandboxPage() {
       { id: 'ready', label: 'Ready', description: 'Your app is ready to view', completed: false }
     ]
   });
-
-
 
   const iframeRef = useRef(null);
   const chatMessagesRef = useRef(null);
@@ -120,7 +118,6 @@ export default function AISandboxPage() {
     scrapedWebsites: [],
     appliedCode: []
   });
-
 
   useEffect(() => {
     let isMounted = true;
