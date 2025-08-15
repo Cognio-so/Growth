@@ -504,7 +504,26 @@ Remember: You are a SURGEON making a precise incision, not an artist repainting 
           }
         }
 
-      const systemPrompt = getUIPrinciplesPrompt() + `
+        let documentContext = '';
+        if (context?.extractedBusinessInfo && context?.documentDesignPrompt) {
+          documentContext = `
+
+## 📄 DOCUMENT-BASED BUSINESS REQUIREMENTS
+
+### Extracted Business Information:
+- **Business Name:** ${context.extractedBusinessInfo.businessName || 'Not specified'}
+- **Unique Value Proposition:** ${context.extractedBusinessInfo.uniqueValueProposition || 'Not specified'}
+- **Competitors:** ${context.extractedBusinessInfo.competitors || 'Not specified'}
+- **Color Palette:** ${context.extractedBusinessInfo.colorPalette || 'Professional and modern colors'}
+- **Preferred Font:** ${context.extractedBusinessInfo.preferredFont || 'Clean, readable fonts'}
+
+### Design Requirements from Document:
+${context.documentDesignPrompt}
+
+**CRITICAL:** The website you create MUST reflect the business's unique value proposition and brand identity as specified above. Use the extracted color palette and font preferences when possible, while following the UI design principles below.`;
+        }
+
+        const systemPrompt = getUIPrinciplesPrompt() + documentContext + `
 
 You are an expert React developer with perfect memory of the conversation. You maintain context across messages and remember scraped websites, generated components, and applied code.
 

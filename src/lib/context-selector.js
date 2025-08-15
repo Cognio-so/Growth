@@ -14,7 +14,9 @@ export const FileContext = {
  */
 export function selectFilesForEdit(
   userPrompt,
-  manifest
+  manifest,
+  extractedBusinessInfo = null,
+  documentDesignPrompt = null
 ) {
   const editIntent = analyzeEditIntent(userPrompt, manifest);
   
@@ -51,7 +53,9 @@ export function selectFilesForEdit(
     editIntent,
     primaryFiles,
     contextFiles,
-    manifest
+    manifest,
+    extractedBusinessInfo,
+    documentDesignPrompt
   );
   
   return {
@@ -70,9 +74,28 @@ function buildSystemPrompt(
   editIntent,
   primaryFiles,
   contextFiles,
-  manifest
+  manifest,
+  extractedBusinessInfo = null,
+  documentDesignPrompt = null
 ) {
   const sections = [];
+  
+  // Add document-based business information if available
+  if (extractedBusinessInfo && documentDesignPrompt) {
+    sections.push(`## 📄 DOCUMENT-BASED BUSINESS REQUIREMENTS
+
+### Extracted Business Information:
+- **Business Name:** ${extractedBusinessInfo.businessName || 'Not specified'}
+- **Unique Value Proposition:** ${extractedBusinessInfo.uniqueValueProposition || 'Not specified'}
+- **Competitors:** ${extractedBusinessInfo.competitors || 'Not specified'}
+- **Color Palette:** ${extractedBusinessInfo.colorPalette || 'Professional and modern colors'}
+- **Preferred Font:** ${extractedBusinessInfo.preferredFont || 'Clean, readable fonts'}
+
+### Design Requirements from Document:
+${documentDesignPrompt}
+
+**CRITICAL:** The website you create MUST reflect the business's unique value proposition and brand identity as specified above. Use the extracted color palette and font preferences when possible, while following the UI design principles below.`);
+  }
   
   // Add UI Design Principles section with the exact guidelines
   sections.push(`## UI/UX DESIGN PRINCIPLES - FOLLOW THESE GUIDELINES STRICTLY

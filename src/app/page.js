@@ -23,6 +23,7 @@ import CodeApplicationProgress from '../../components/CodeApplicationProgress';
 import appConfig from '../../config/app.config';
 import { Button } from '../../components/ui/button';
 import ProgressStages from '../../components/ProgressStages';
+import DocumentUpload from '../../components/DocumentUpload';
 
 // Create a wrapper component that uses useSearchParams
 function AISandboxPageContent() {
@@ -118,6 +119,12 @@ function AISandboxPageContent() {
     scrapedWebsites: [],
     appliedCode: []
   });
+
+  const [showDocumentUpload, setShowDocumentUpload] = useState(false);
+  const [extractedBusinessInfo, setExtractedBusinessInfo] = useState(null);
+  const [documentDesignPrompt, setDocumentDesignPrompt] = useState('');
+  const [showExtractedDataReview, setShowExtractedDataReview] = useState(false);
+  const [editableExtractedInfo, setEditableExtractedInfo] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -1440,7 +1447,6 @@ Tip: I automatically detect and install npm packages from your code imports (lik
       });
     }
 
-
     const isEdit = conversationContext.appliedCode.length > 0;
 
     try {
@@ -1470,18 +1476,43 @@ Tip: I automatically detect and install npm packages from your code imports (lik
         conversationContext: conversationContext,
         currentCode: promptInput,
         sandboxUrl: sandboxData?.url,
-        sandboxCreating: sandboxCreating
+        sandboxCreating: sandboxCreating,
+        extractedBusinessInfo: extractedBusinessInfo,
+        documentDesignPrompt: documentDesignPrompt
       };
 
       console.log('[chat] Sending context to AI:');
       console.log('[chat] - sandboxId:', fullContext.sandboxId);
       console.log('[chat] - isEdit:', conversationContext.appliedCode.length > 0);
+      console.log('[chat] - hasDocumentPrompt:', !!documentDesignPrompt);
+      console.log('[chat] - message:', message.substring(0, 100) + '...');
+
+      let finalPrompt = message;
+      
+      // Check if this is a document-based generation
+      const isDocumentGeneration = documentDesignPrompt && (
+        message === documentDesignPrompt || 
+        message.includes('Create a modern, professional website') ||
+        message.includes('BUSINESS INFORMATION:') ||
+        message.includes('UI/UX DESIGN PRINCIPLES TO FOLLOW:')
+      );
+      
+      if (isDocumentGeneration) {
+        console.log('[chat] Detected document-based generation');
+        finalPrompt = `Generate a website based on the uploaded business document requirements:
+
+${documentDesignPrompt}
+
+Please create a complete React application following the UI/UX design principles and the extracted business information.`;
+      }
+
+      console.log('[chat] Final prompt length:', finalPrompt.length);
 
       const response = await fetch('/api/generate-ai-code-stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: message,
+          prompt: finalPrompt,
           model: aiModel,
           context: fullContext,
           isEdit: conversationContext.appliedCode.length > 0
@@ -2866,6 +2897,350 @@ Focus on creating a beautiful, functional website that matches the description.`
     }
   };
 
+  const handleDocumentProcessed = (extractedInfo, designPrompt) => {
+    setExtractedBusinessInfo(extractedInfo);
+    setDocumentDesignPrompt(designPrompt);
+    setShowDocumentUpload(false);
+    
+    // Initialize editable data with the extracted info
+    setEditableExtractedInfo(extractedInfo);
+    
+    // Add a chat message about the extracted information
+    addChatMessage(`Document processed! Extracted business information:
+• Business Name: ${extractedInfo.businessName || 'Not found'}
+• Unique Value: ${extractedInfo.uniqueValueProposition || 'Not found'}
+• Color Palette: ${extractedInfo.colorPalette || 'Not found'}
+• Font Preference: ${extractedInfo.preferredFont || 'Not found'}
+
+I'll now generate a website based on these requirements and our UI design principles.`, 'system');
+    
+    // Show extracted data review modal instead of auto-generating
+    setShowExtractedDataReview(true);
+  };
+
+  const handleDocumentError = (error) => {
+    addChatMessage(`Document upload error: ${error}`, 'error');
+  };
+
+  const handleExtractedDataReview = () => {
+    setShowExtractedDataReview(false);
+    
+    // Update the extracted info with any edits
+    if (editableExtractedInfo) {
+      setExtractedBusinessInfo(editableExtractedInfo);
+      const updatedDesignPrompt = generateDesignPrompt(editableExtractedInfo);
+      setDocumentDesignPrompt(updatedDesignPrompt);
+    }
+    
+    // Get the current prompt
+    const currentPrompt = editableExtractedInfo ? 
+      generateDesignPrompt(editableExtractedInfo) : 
+      documentDesignPrompt;
+    
+    // Follow the same flow as text input generation
+    addChatMessage(`Generating website from uploaded document requirements`, 'system');
+
+    const sandboxPromise = !sandboxData ? createSandbox(true) : Promise.resolve();
+
+    setLoadingStage('planning');
+    setActiveTab('preview');
+
+    setTimeout(async () => {
+      setShowHomeScreen(false);
+      setHomeScreenFading(false);
+
+      await sandboxPromise;
+
+      setLoadingStage('generating');
+      setActiveTab('generation');
+
+      try {
+        setConversationContext(prev => ({
+          ...prev,
+          currentProject: `Document-Based Website: ${extractedBusinessInfo?.businessName || 'Business'}`
+        }));
+
+        setGenerationProgress(prev => ({
+          isGenerating: true,
+          status: 'Initializing AI...',
+          components: [],
+          currentComponent: 0,
+          streamedCode: '',
+          isStreaming: true,
+          isThinking: false,
+          thinkingText: undefined,
+          thinkingDuration: undefined,
+          files: prev.files || [],
+          currentFile: undefined,
+          lastProcessedPosition: 0
+        }));
+
+        const aiResponse = await fetch('/api/generate-ai-code-stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: currentPrompt,
+            model: aiModel,
+            context: {
+              sandboxId: sandboxData?.sandboxId,
+              structure: structureContent,
+              conversationContext: conversationContext,
+              extractedBusinessInfo: extractedBusinessInfo,
+              documentDesignPrompt: documentDesignPrompt
+            }
+          })
+        });
+
+        if (!aiResponse.ok || !aiResponse.body) {
+          throw new Error('Failed to generate code');
+        }
+
+        // Same streaming logic as text input
+        const reader = aiResponse.body.getReader();
+        const decoder = new TextDecoder();
+        let generatedCode = '';
+        let explanation = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+
+                if (data.type === 'status') {
+                  setGenerationProgress(prev => ({ ...prev, status: data.message }));
+                } else if (data.type === 'thinking') {
+                  setGenerationProgress(prev => ({
+                    ...prev,
+                    isThinking: true,
+                    thinkingText: (prev.thinkingText || '') + data.text
+                  }));
+                } else if (data.type === 'thinking_complete') {
+                  setGenerationProgress(prev => ({
+                    ...prev,
+                    isThinking: false,
+                    thinkingDuration: data.duration
+                  }));
+                } else if (data.type === 'conversation') {
+                  let text = data.text || '';
+
+                  text = text.replace(/<package>[^<]*<\/package>/g, '');
+                  text = text.replace(/<packages>[^<]*<\/packages>/g, '');
+
+                  if (!text.includes('<file') && !text.includes('import React') &&
+                    !text.includes('export default') && !text.includes('className=') &&
+                    text.trim().length > 0) {
+                    addChatMessage(text.trim(), 'ai');
+                  }
+                } else if (data.type === 'stream' && data.raw) {
+                  setGenerationProgress(prev => {
+                    const newStreamedCode = prev.streamedCode + data.text;
+
+                    const updatedState = {
+                      ...prev,
+                      streamedCode: newStreamedCode,
+                      isStreaming: true,
+                      isThinking: false,
+                      status: 'Generating code...'
+                    };
+
+                    const fileRegex = /<file path="([^"]+)">([^]*?)<\/file>/g;
+                    let match;
+                    const processedFiles = new Set(prev.files.map(f => f.path));
+
+                    while ((match = fileRegex.exec(newStreamedCode)) !== null) {
+                      const filePath = match[1];
+                      const fileContent = match[2];
+
+                      if (!processedFiles.has(filePath)) {
+                        const fileExt = filePath.split('.').pop() || '';
+                        const fileType = fileExt === 'jsx' || fileExt === 'js' ? 'javascript' :
+                          fileExt === 'css' ? 'css' :
+                            fileExt === 'json' ? 'json' :
+                              fileExt === 'html' ? 'html' : 'text';
+
+                        const existingFileIndex = updatedState.files.findIndex(f => f.path === filePath);
+
+                        if (existingFileIndex >= 0) {
+                          updatedState.files = [
+                            ...updatedState.files.slice(0, existingFileIndex),
+                            {
+                              ...updatedState.files[existingFileIndex],
+                              content: fileContent.trim(),
+                              type: fileType,
+                              completed: true,
+                              edited: true
+                            },
+                            ...updatedState.files.slice(existingFileIndex + 1)
+                          ];
+                        } else {
+                          updatedState.files = [...updatedState.files, {
+                            path: filePath,
+                            content: fileContent.trim(),
+                            type: fileType,
+                            completed: true,
+                            edited: false
+                          }];
+                        }
+
+                        if (!prev.isEdit) {
+                          updatedState.status = `Completed ${filePath}`;
+                        }
+                        processedFiles.add(filePath);
+                      }
+                    }
+
+                    const lastFileMatch = newStreamedCode.match(/<file path="([^"]+)">([^]*?)$/);
+                    if (lastFileMatch && !lastFileMatch[0].includes('</file>')) {
+                      const filePath = lastFileMatch[1];
+                      const partialContent = lastFileMatch[2];
+
+                      if (!processedFiles.has(filePath)) {
+                        const fileExt = filePath.split('.').pop() || '';
+                        const fileType = fileExt === 'jsx' || fileExt === 'js' ? 'javascript' :
+                          fileExt === 'css' ? 'css' :
+                            fileExt === 'json' ? 'json' :
+                              fileExt === 'html' ? 'html' : 'text';
+
+                        updatedState.currentFile = {
+                          path: filePath,
+                          content: partialContent,
+                          type: fileType
+                        };
+                        if (!prev.isEdit) {
+                          updatedState.status = `Generating ${filePath}`;
+                        }
+                      }
+                    } else {
+                      updatedState.currentFile = undefined;
+                    }
+
+                    return updatedState;
+                  });
+                } else if (data.type === 'complete') {
+                  generatedCode = data.generatedCode;
+                  explanation = data.explanation;
+
+                  setConversationContext(prev => ({
+                    ...prev,
+                    lastGeneratedCode: generatedCode
+                  }));
+                }
+              } catch (e) {
+                console.error('Failed to parse SSE data:', e);
+              }
+            }
+          }
+        }
+
+        setGenerationProgress(prev => ({
+          ...prev,
+          isGenerating: false,
+          isStreaming: false,
+          status: 'Generation complete!'
+        }));
+
+        if (generatedCode) {
+          addChatMessage('AI website generated!', 'system');
+
+          if (explanation && explanation.trim()) {
+            addChatMessage(explanation, 'ai');
+          }
+
+          setPromptInput(generatedCode);
+
+          await applyGeneratedCode(generatedCode, false);
+
+          addChatMessage(
+            `Successfully created a website based on your uploaded document requirements!`,
+            'ai',
+            {
+              generatedCode: generatedCode
+            }
+          );
+
+          setConversationContext(prev => ({
+            ...prev,
+            generatedComponents: [],
+            appliedCode: [...prev.appliedCode, {
+              files: [],
+              timestamp: new Date()
+            }]
+          }));
+        } else {
+          throw new Error('Failed to generate website');
+        }
+
+        setGenerationProgress(prev => ({
+          ...prev,
+          isGenerating: false,
+          isStreaming: false,
+          status: 'Generation complete!'
+        }));
+
+        setLoadingStage(null);
+
+        setTimeout(() => {
+          setActiveTab('preview');
+        }, 1000);
+      } catch (error) {
+        addChatMessage(`Failed to generate website: ${error.message}`, 'system');
+        setGenerationProgress(prev => ({
+          ...prev,
+          isGenerating: false,
+          isStreaming: false,
+          status: '',
+          files: prev.files
+        }));
+      }
+    }, 500);
+  };
+
+  const generateDesignPrompt = (extractedInfo) => {
+    const { businessName, uniqueValueProposition, competitors, colorPalette, preferredFont } = extractedInfo;
+    
+    return `Create a modern, professional website for ${businessName || 'this business'} based on the following extracted information:
+
+BUSINESS INFORMATION:
+- Business Name: ${businessName || 'Not specified'}
+- Unique Value Proposition: ${uniqueValueProposition || 'Not specified'}
+- Competitors: ${competitors || 'Not specified'}
+
+DESIGN REQUIREMENTS:
+- Color Palette: ${colorPalette || 'Professional and modern colors'}
+- Preferred Font: ${preferredFont || 'Clean, readable fonts'}
+
+UI/UX DESIGN PRINCIPLES TO FOLLOW:
+1. Layout & Grids: Use a simple 12-column grid system for balanced, responsive layouts
+2. Typography: Use 1-2 font families with clear hierarchy (H1 for main titles, H2-H4 for structure, 16-18px body text)
+3. Color: Follow 60-30-10 rule (60% neutral, 30% main color, 10% accent). Ensure high contrast for readability
+4. Spacing: Use consistent spacing scale (8px, 16px, 24px, 64px) with proper white space
+5. Visual Hierarchy: Guide user attention with size, color, and placement
+6. Navigation: Simple, consistent navigation with 5-7 main items
+7. Buttons & CTAs: Bold, contrasting colors with clear action-oriented labels
+8. Icons & Images: Crisp vector icons and high-quality images
+9. Motion: Subtle animations (200-500ms) with natural easing
+10. Responsiveness: Mobile-first design that scales to all screen sizes
+
+REQUIREMENTS:
+- Create a complete React application with modern design
+- Use Tailwind CSS for all styling
+- Make it fully responsive
+- Include hover effects and smooth transitions
+- Create separate components for major sections (Header, Hero, About, Services, etc.)
+- Use semantic HTML5 elements
+- Ensure accessibility and performance
+- Create a professional, trustworthy appearance that reflects the business's unique value proposition
+
+Focus on creating a website that embodies the business's brand identity and effectively communicates their unique value proposition to potential customers.`;
+  };
+
   return (
     <div className="font-sans bg-background text-foreground h-screen flex flex-col">
       {showHomeScreen && (
@@ -2909,7 +3284,7 @@ Focus on creating a beautiful, functional website that matches the description.`
           <div className="absolute top-0 left-0 right-0 z-20 px-6 py-4 flex items-center justify-between animate-[fadeIn_0.8s_ease-out]">
             <img
               src="/logo-growth99.svg"
-              alt="Firecrawl"
+              alt="growth99"
               className="h-8 w-auto"
             />
           </div>
@@ -2933,36 +3308,55 @@ Focus on creating a beautiful, functional website that matches the description.`
               </div>
 
               <form onSubmit={handleHomeScreenSubmit} className="mt-5 max-w-3xl mx-auto">
-                <div className="w-full relative group">
-                  <input
-                    value={homeUrlInput}
-                    onChange={(e) => setHomeUrlInput(e.target.value)}
-                    placeholder="" // Remove the native placeholder
-                    className="h-[3.25rem] w-full focus-visible:outline-none focus-visible:ring-orange-500 focus-visible:ring-2 rounded-[18px] text-sm text-[#36322F] px-4 py-3 pr-12 border-[.75px] border-border bg-white"
-                    style={{
-                      boxShadow: '0 0 0 1px #e3e1de66, 0 1px 2px #5f4a2e14, 0 4px 6px #5f4a2e0a, 0 40px 40px -24px #684b2514',
-                      filter: 'drop-shadow(rgba(249, 224, 184, 0.3) -0.731317px -0.731317px 35.6517px)'
-                    }}
-                    autoFocus
-                  />
-                  <div
-                    aria-hidden="true"
-                    className={`absolute top-1/2 -translate-y-1/2 left-4 pointer-events-none text-sm text-opacity-50 text-start transition-opacity ${homeUrlInput ? 'opacity-0' : 'opacity-100'}`}
-                  >
-                    <span className="text-[#605A57]/50 text-xs" style={{ fontFamily: 'monospace' }}>
-                      https://example.com or "Create a modern portfolio website"
-                    </span>
+                <div className="flex items-center gap-4">
+                  <div className="flex-1 relative group">
+                    <input
+                      value={homeUrlInput}
+                      onChange={(e) => setHomeUrlInput(e.target.value)}
+                      placeholder="" // Remove the native placeholder
+                      className="h-[3.25rem] w-full focus-visible:outline-none focus-visible:ring-orange-500 focus-visible:ring-2 rounded-[18px] text-sm text-[#36322F] px-4 py-3 pr-12 border-[.75px] border-border bg-white"
+                      style={{
+                        boxShadow: '0 0 0 1px #e3e1de66, 0 1px 2px #5f4a2e14, 0 4px 6px #5f4a2e0a, 0 40px 40px -24px #684b2514',
+                        filter: 'drop-shadow(rgba(249, 224, 184, 0.3) -0.731317px -0.731317px 35.6517px)'
+                      }}
+                      autoFocus
+                    />
+                    <div
+                      aria-hidden="true"
+                      className={`absolute top-1/2 -translate-y-1/2 left-4 pointer-events-none text-sm text-opacity-50 text-start transition-opacity ${homeUrlInput ? 'opacity-0' : 'opacity-100'}`}
+                    >
+                      <span className="text-[#605A57]/50 text-xs" style={{ fontFamily: 'monospace' }}>
+                        https://example.com or "Create a modern portfolio website"
+                      </span>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={!homeUrlInput.trim()}
+                      className="absolute top-1/2 transform -translate-y-1/2 right-2 flex h-10 items-center justify-center rounded-md px-3 text-sm font-medium text-zinc-500 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      title="Generate Website"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                        <polyline points="9 10 4 15 9 20"></polyline>
+                        <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
+                      </svg>
+                    </button>
                   </div>
+                  
                   <button
-                    type="submit"
-                    disabled={!homeUrlInput.trim()}
-                    className="absolute top-1/2 transform -translate-y-1/2 right-2 flex h-10 items-center justify-center rounded-md px-3 text-sm font-medium text-zinc-500 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    title="Generate Website"
+                    type="button"
+                    onClick={() => {
+                      console.log('Upload button clicked');
+                      setShowDocumentUpload(true);
+                    }}
+                    className="flex items-center gap-2 px-4 py-3 bg-white border border-gray-300 rounded-[18px] hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700 shadow-lg"
+                    style={{
+                      boxShadow: '0 0 0 1px #e3e1de66, 0 1px 2px #5f4a2e14, 0 4px 8px rgba(0,0,0,0.1)'
+                    }}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                      <polyline points="9 10 4 15 9 20"></polyline>
-                      <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
                     </svg>
+                    Upload Doc
                   </button>
                 </div>
               </form>
@@ -3000,8 +3394,8 @@ Focus on creating a beautiful, functional website that matches the description.`
       <div className="bg-card px-4 py-4 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-4">
           <img
-            src="/firecrawl-logo-with-fire.webp"
-            alt="Firecrawl"
+            src="/logo-growth99.svg"
+            alt="growth99"
             className="h-8 w-auto"
           />
         </div>
@@ -3395,6 +3789,204 @@ Focus on creating a beautiful, functional website that matches the description.`
           </div>
         </div>
       </div>
+
+      {showDocumentUpload && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" style={{ zIndex: 9999 }}>
+          <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">Upload Business Document</h2>
+              <button
+                onClick={() => {
+                  console.log('Closing modal');
+                  setShowDocumentUpload(false);
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <DocumentUpload
+              onDocumentProcessed={(info, prompt) => {
+                console.log('Document processed:', info);
+                handleDocumentProcessed(info, prompt);
+              }}
+              onError={(error) => {
+                console.log('Document error:', error);
+                handleDocumentError(error);
+              }}
+            />
+            
+            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+              <h3 className="font-medium text-gray-900 mb-2">What information will be extracted?</h3>
+              <ul className="text-sm text-gray-600 space-y-1">
+                <li>• Business Name</li>
+                <li>• Unique Value Proposition</li>
+                <li>• Competitors and Their Websites</li>
+                <li>• Color Palette Scheme</li>
+                <li>• Preferred Font Style</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showExtractedDataReview && extractedBusinessInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" style={{ zIndex: 9999 }}>
+          <div className="bg-white rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">Review Extracted Business Information</h2>
+              <button
+                onClick={() => setShowExtractedDataReview(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Extracted Data Display */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-gray-900">Extracted Information</h3>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Business Name</label>
+                    <input
+                      type="text"
+                      value={editableExtractedInfo?.businessName || extractedBusinessInfo.businessName || ''}
+                      onChange={(e) => setEditableExtractedInfo(prev => ({
+                        ...prev,
+                        ...extractedBusinessInfo,
+                        businessName: e.target.value
+                      }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      placeholder="Enter business name"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Unique Value Proposition</label>
+                    <textarea
+                      value={editableExtractedInfo?.uniqueValueProposition || extractedBusinessInfo.uniqueValueProposition || ''}
+                      onChange={(e) => setEditableExtractedInfo(prev => ({
+                        ...prev,
+                        ...extractedBusinessInfo,
+                        uniqueValueProposition: e.target.value
+                      }))}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      placeholder="What makes your business unique?"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Competitors</label>
+                    <input
+                      type="text"
+                      value={editableExtractedInfo?.competitors || extractedBusinessInfo.competitors || ''}
+                      onChange={(e) => setEditableExtractedInfo(prev => ({
+                        ...prev,
+                        ...extractedBusinessInfo,
+                        competitors: e.target.value
+                      }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      placeholder="List your main competitors"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Color Palette</label>
+                    <input
+                      type="text"
+                      value={editableExtractedInfo?.colorPalette || extractedBusinessInfo.colorPalette || ''}
+                      onChange={(e) => setEditableExtractedInfo(prev => ({
+                        ...prev,
+                        ...extractedBusinessInfo,
+                        colorPalette: e.target.value
+                      }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      placeholder="e.g., Blue, white, and gray"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Preferred Font</label>
+                    <input
+                      type="text"
+                      value={editableExtractedInfo?.preferredFont || extractedBusinessInfo.preferredFont || ''}
+                      onChange={(e) => setEditableExtractedInfo(prev => ({
+                        ...prev,
+                        ...extractedBusinessInfo,
+                        preferredFont: e.target.value
+                      }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      placeholder="e.g., Clean, modern sans-serif"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Design Preview */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-gray-900">Design Preview</h3>
+                
+                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-4 h-4 bg-orange-500 rounded-full"></div>
+                    <span className="font-medium text-gray-900">
+                      {editableExtractedInfo?.businessName || extractedBusinessInfo.businessName || 'Your Business'}
+                    </span>
+                  </div>
+                  
+                  <div className="text-sm text-gray-600">
+                    <strong>Value Proposition:</strong><br/>
+                    {editableExtractedInfo?.uniqueValueProposition || extractedBusinessInfo.uniqueValueProposition || 'Professional services and solutions'}
+                  </div>
+                  
+                  <div className="text-sm text-gray-600">
+                    <strong>Style:</strong> {editableExtractedInfo?.colorPalette || extractedBusinessInfo.colorPalette || 'Professional and modern colors'} with {editableExtractedInfo?.preferredFont || extractedBusinessInfo.preferredFont || 'clean, readable fonts'}
+                  </div>
+                  
+                  <div className="text-sm text-gray-600">
+                    <strong>Competition:</strong> {editableExtractedInfo?.competitors || extractedBusinessInfo.competitors || 'Industry competitors'}
+                  </div>
+                </div>
+                
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  <h4 className="font-medium text-orange-900 mb-2">What will be generated:</h4>
+                  <ul className="text-sm text-orange-800 space-y-1">
+                    <li>• Modern, responsive website design</li>
+                    <li>• Professional color scheme based on your preferences</li>
+                    <li>• Typography matching your font requirements</li>
+                    <li>• Sections highlighting your unique value proposition</li>
+                    <li>• Mobile-first, accessible design</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-200">
+              <button
+                onClick={() => setShowExtractedDataReview(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExtractedDataReview}
+                className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors font-medium"
+              >
+                Generate Website
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

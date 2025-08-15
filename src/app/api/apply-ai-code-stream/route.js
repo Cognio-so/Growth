@@ -354,9 +354,7 @@ export async function POST(request) {
           });
 
           try {
-            const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-            const host = req.headers.get('host') || 'localhost:3000';
-            const apiUrl = `${protocol}://${host}/api/install-packages`;
+            const apiUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/install-packages`;
 
             const installResponse = await fetch(apiUrl, {
               method: 'POST',
