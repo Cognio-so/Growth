@@ -1,0 +1,49 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "noEmit": true,
+    "incremental": true,
+    "module": "esnext",
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
+  },
+  "include": [
+    "next-env.d.ts",
+    ".next/types/**/*.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    "src/app/api/install-packages/route.js",
+    "src/app/api/kill-sandbox/route.js",
+    "src/app/api/scrape-url-enhanced/route.js",
+    "src/app/api/scrape-screenshot/route.js",
+    "src/app/api/sandbox-status/route.js",
+    "src/app/api/sandbox-logs/route.js",
+    "src/app/api/run-command/route.js",
+    "src/app/api/restart-vite/route.js",
+    "src/app/api/report-vite-error/route.js",
+    "src/app/api/monitor-vite-logs/route.js",
+    "src/components/CodeApplicationProgress.jsx",
+    "src/components/HMRErrorDetector.jsx",
+    "src/components/SandboxPreview.jsx",
+    "config/app.config.js",
+    "src/lib/icons.js",
+    "src/lib/file-parser.js",
+    "src/lib/edit-intent-analyzer.js",
+    "src/lib/context-selector.js",
+    "src/lib/edit-examples.js",
+    "src/lib/utils.js"
+  ],
+  "exclude": ["node_modules"]
+}
