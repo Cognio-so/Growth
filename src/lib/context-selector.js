@@ -1,6 +1,8 @@
 import { FileManifest, EditIntent, EditType } from '../types/file-manifest';
 import { analyzeEditIntent } from './edit-intent-analyzer';
 import { getEditExamplesPrompt, getComponentPatternPrompt } from './edit-examples';
+// Fix the import statement - add the missing functions
+import { getRandomDesignSchema, extractDesignPatterns, schemaToUIPrinciples, getSchemaCount } from './design-schema-utils';
 
 export const FileContext = {
   primaryFiles: [], 
@@ -16,9 +18,42 @@ export function selectFilesForEdit(
   userPrompt,
   manifest,
   extractedBusinessInfo = null,
-  documentDesignPrompt = null
+  documentDesignPrompt = null,
+  designSchema = null
 ) {
   const editIntent = analyzeEditIntent(userPrompt, manifest);
+  
+  // Check if this is a redesign request
+  const isRedesign = userPrompt.toLowerCase().includes('redesign');
+  
+  if (isRedesign) {
+    // For redesign, we want to edit all component files
+    const allFiles = Object.keys(manifest.files);
+    const componentFiles = allFiles.filter(file => 
+      file.endsWith('.jsx') || file.endsWith('.tsx') || file.endsWith('.css')
+    );
+    
+    const primaryFiles = componentFiles;
+    const contextFiles = allFiles.filter(file => !primaryFiles.includes(file));
+    
+    const systemPrompt = buildSystemPrompt(
+      userPrompt,
+      { ...editIntent, type: 'REDESIGN', description: 'Redesigning website with random schema' },
+      primaryFiles,
+      contextFiles,
+      manifest,
+      extractedBusinessInfo,
+      documentDesignPrompt,
+      designSchema
+    );
+    
+    return {
+      primaryFiles,
+      contextFiles,
+      systemPrompt,
+      editIntent: { ...editIntent, type: 'REDESIGN', description: 'Redesigning website with random schema' },
+    };
+  }
   
   const primaryFiles = editIntent.targetFiles;
   const allFiles = Object.keys(manifest.files);
@@ -55,7 +90,8 @@ export function selectFilesForEdit(
     contextFiles,
     manifest,
     extractedBusinessInfo,
-    documentDesignPrompt
+    documentDesignPrompt,
+    designSchema
   );
   
   return {
@@ -67,7 +103,7 @@ export function selectFilesForEdit(
 }
 
 /**
- * Build an enhanced system prompt with file structure context
+ * Build an enhanced system prompt with file structure context and design schema
  */
 function buildSystemPrompt(
   userPrompt,
@@ -76,9 +112,143 @@ function buildSystemPrompt(
   contextFiles,
   manifest,
   extractedBusinessInfo = null,
-  documentDesignPrompt = null
+  documentDesignPrompt = null,
+  designSchema = null
 ) {
   const sections = [];
+  
+  // Add CSV design schema context if available - UPDATED to match route.js
+  if (designSchema && designSchema.schema) {
+    const designPatterns = extractDesignPatterns(designSchema);
+    const csvData = designSchema.schema;
+    
+    sections.push(`## 🎯 PRIMARY DESIGN GUIDE: CSV SCHEMA DATA
+
+**CRITICAL: This CSV schema is your PRIMARY design blueprint. Follow it exactly for UI/UX design.**
+
+### 🎨 Design Source: ${designSchema.url || 'Random CSV Schema'}
+### 📊 Schema ID: ${designSchema.id || 'N/A'}
+### 📈 Total Schemas Available: ${getSchemaCount()}
+
+**IMPLEMENTATION PRIORITY:**
+1. CSV Design Schema (PRIMARY - USE THIS FIRST)
+2. Scraped Content (SECONDARY - for content only)
+3. UI Principles (FALLBACK - general guidelines)
+
+${JSON.stringify(csvData, null, 2)}
+
+### 🧩 COMPONENT-BY-COMPONENT IMPLEMENTATION GUIDE:
+
+${(() => {
+  if (!csvData) return '';
+  
+  let instructions = '';
+  
+  // Extract component specifications
+  if (csvData.components) {
+    instructions += `\n### COMPONENT SPECIFICATIONS:\n`;
+    for (const [componentName, component] of Object.entries(csvData.components)) {
+      instructions += `\n**${componentName} Component:**\n`;
+      instructions += `- **Type:** ${component.type}\n`;
+      instructions += `- **Description:** ${component.description}\n`;
+      
+      if (component.typography) {
+        instructions += `- **Typography Requirements:**\n`;
+        for (const [element, typography] of Object.entries(component.typography)) {
+          instructions += `  - ${element}: ${typography.visual_description || typography.weight || 'default'}\n`;
+        }
+      }
+      
+      if (component.spacing) {
+        instructions += `- **Spacing:** Padding: ${component.spacing.padding || 'default'}, Margin: ${component.spacing.margin || 'default'}\n`;
+      }
+      
+      if (component.colors) {
+        instructions += `- **Color Scheme:**\n`;
+        instructions += `  - Background: ${component.colors.background}\n`;
+        instructions += `  - Text: ${component.colors.text}\n`;
+        instructions += `  - Accent: ${component.colors.accent}\n`;
+      }
+      
+      if (component.image_style) {
+        instructions += `- **Image Style:** ${component.image_style}\n`;
+      }
+      
+      if (component.other_visual_notes) {
+        instructions += `- **Visual Notes:** ${component.other_visual_notes}\n`;
+      }
+    }
+  }
+  
+  // Extract page structure
+  if (csvData.page_structure) {
+    instructions += `\n### 📄 PAGE STRUCTURE (IMPLEMENT IN THIS EXACT ORDER):\n`;
+    csvData.page_structure.forEach((item, index) => {
+      instructions += `${index + 1}. **${item.component}** - ${item.description || 'Component to be implemented'}\n`;
+    });
+  }
+  
+  // Extract design system
+  if (csvData.design_system) {
+    instructions += `\n### 🎨 DESIGN SYSTEM:\n`;
+    instructions += JSON.stringify(csvData.design_system, null, 2);
+  }
+  
+  // Extract layout guidelines
+  if (csvData.layout_guidelines) {
+    instructions += `\n### 📐 LAYOUT GUIDELINES:\n`;
+    instructions += JSON.stringify(csvData.layout_guidelines, null, 2);
+  }
+  
+  return instructions;
+})()}
+
+### 🎯 DESIGN PATTERNS EXTRACTED:
+
+${(() => {
+  if (!designPatterns) return '';
+  
+  let patterns = '';
+  
+  if (designPatterns.colorPalette && Object.keys(designPatterns.colorPalette).length > 0) {
+    patterns += `\n**Color Patterns:**\n`;
+    for (const [component, colors] of Object.entries(designPatterns.colorPalette)) {
+      patterns += `- ${component}: ${colors.background} background, ${colors.text} text, ${colors.accent} accent\n`;
+    }
+  }
+  
+  if (designPatterns.typography && Object.keys(designPatterns.typography).length > 0) {
+    patterns += `\n**Typography Patterns:**\n`;
+    for (const [component, typography] of Object.entries(designPatterns.typography)) {
+      patterns += `- ${component}: ${Object.entries(typography).map(([k, v]) => `${k}: ${v.visual_description || v.weight}`).join(', ')}\n`;
+    }
+  }
+  
+  if (designPatterns.spacing && Object.keys(designPatterns.spacing).length > 0) {
+    patterns += `\n**Spacing Patterns:**\n`;
+    for (const [component, spacing] of Object.entries(designPatterns.spacing)) {
+      patterns += `- ${component}: ${spacing.padding} padding, ${spacing.margin} margin\n`;
+    }
+  }
+  
+  return patterns;
+})()}
+
+### 🎯 CRITICAL DESIGN IMPLEMENTATION RULES:
+
+1. **FOLLOW CSV SPECIFICATIONS EXACTLY** - The CSV design schema is your primary guide
+2. **IMPLEMENT COMPONENTS IN ORDER** - Follow the page_structure sequence precisely
+3. **APPLY EXACT COLORS AND TYPOGRAPHY** - Use the specified color schemes and typography
+4. **MAINTAIN COMPONENT SPECIFICATIONS** - Follow the component definitions exactly as written
+5. **USE DESIGN PATTERNS CONSISTENTLY** - Apply the extracted patterns across all components
+6. **ENSURE RESPONSIVE DESIGN** - Make all components work across all screen sizes
+7. **MAINTAIN VISUAL HIERARCHY** - Follow the visual hierarchy as described in the schema
+
+**IMPLEMENTATION PRIORITY:**
+1. CSV Design Schema (PRIMARY)
+2. UI/UX Principles (GENERAL GUIDELINES)
+3. User Requirements (CONTEXT)`);
+  }
   
   // Add document-based business information if available
   if (extractedBusinessInfo && documentDesignPrompt) {
@@ -98,7 +268,7 @@ ${documentDesignPrompt}
   }
   
   // Add UI Design Principles section with the exact guidelines
-  sections.push(`## UI/UX DESIGN PRINCIPLES - FOLLOW THESE GUIDELINES STRICTLY
+  sections.push(`## 🎨 ENHANCED UI/UX DESIGN PRINCIPLES - FOLLOW THESE GUIDELINES
 
 ### 1. Layout & Grids
 - Use a simple 12-column grid system to keep things neat and balanced
@@ -185,7 +355,9 @@ ${documentDesignPrompt}
 - Use breakpoints (768px, 1024px) to tweak layouts
 - Make sure everything looks great and works smoothly on all screens
 
-CRITICAL IMPLEMENTATION REQUIREMENTS:
+## 🎨 ENHANCED IMPLEMENTATION REQUIREMENTS
+
+When creating React components:
 1. **ALWAYS** use Tailwind CSS classes that follow these exact principles
 2. **ALWAYS** implement mobile-first responsive design
 3. **ALWAYS** use semantic HTML5 elements
@@ -196,6 +368,61 @@ CRITICAL IMPLEMENTATION REQUIREMENTS:
 8. **ALWAYS** use the 12-column grid system approach
 9. **ALWAYS** ensure 16-18px minimum text size
 10. **ALWAYS** implement proper button sizing (44x44px minimum)
+11. **ALWAYS** follow the CSV design schema specifications when available
+12. **ALWAYS** implement components in the exact order specified in the page structure
+
+🎨 **CRITICAL RULES - YOUR MOST IMPORTANT INSTRUCTIONS:**
+
+${designSchema ? `🎨 **CSV SCHEMA PRIORITY:**
+1. **FOLLOW CSV SPECIFICATIONS EXACTLY** - The CSV design schema is your primary guide
+2. **IMPLEMENT COMPONENTS IN ORDER** - Follow the page_structure sequence precisely
+3. **USE SPECIFIED COLORS AND TYPOGRAPHY** - Apply the exact color schemes and typography from the schema
+4. **MAINTAIN COMPONENT SPECIFICATIONS** - Follow the component definitions exactly as written
+5. **COMBINE WITH UI PRINCIPLES** - Use general UI principles to enhance the CSV specifications` : ''}
+
+1. **DO EXACTLY WHAT IS ASKED - NOTHING MORE, NOTHING LESS**
+   - Don't add features not requested
+   - Don't fix unrelated issues
+   - Don't improve things not mentioned
+2. **CHECK App.jsx FIRST** - ALWAYS see what components exist before creating new ones
+3. **NAVIGATION LIVES IN Header.jsx** - Don't create Nav.jsx if Header exists with nav
+4. **USE STANDARD TAILWIND CLASSES ONLY**:
+   - ✅ CORRECT: bg-white, text-black, bg-blue-500, bg-gray-100, text-gray-900
+   - ❌ WRONG: bg-background, text-foreground, bg-primary, bg-muted, text-secondary
+   - Use ONLY classes from the official Tailwind CSS documentation
+5. **FILE COUNT LIMITS**:
+   - Simple style/text change = 1 file ONLY
+   - New component = 2 files MAX (component + parent)
+   - If >3 files, YOU'RE DOING TOO MUCH
+
+COMPONENT RELATIONSHIPS (CHECK THESE FIRST):
+- Navigation usually lives INSIDE Header.jsx, not separate Nav.jsx
+- Logo is typically in Header, not standalone
+- Footer often contains nav links already
+- Menu/Hamburger is part of Header, not separate
+
+PACKAGE USAGE RULES:
+- DO NOT use react-router-dom unless user explicitly asks for routing
+- For simple nav links in a single-page app, use scroll-to-section or href="#"
+- Only add routing if building a multi-page application
+- Common packages are auto-installed from your imports
+
+WEBSITE CLONING REQUIREMENTS:
+When recreating/cloning a website, you MUST include:
+1. **Header with Navigation** - Usually Header.jsx containing nav
+2. **Hero Section** - The main landing area (Hero.jsx)
+3. **Main Content Sections** - Features, Services, About, etc.
+4. **Footer** - Contact info, links, copyright (Footer.jsx)
+
+${designSchema ? `🎨 **CSV SCHEMA IMPLEMENTATION CHECKLIST:**
+- [ ] Implement all components specified in the CSV schema
+- [ ] Follow the exact page structure order
+- [ ] Apply the specified color schemes for each component
+- [ ] Use the typography specifications as defined
+- [ ] Maintain the spacing and layout requirements
+- [ ] Ensure responsive design across all components
+- [ ] Follow the visual hierarchy as described
+- [ ] Implement any special visual notes or requirements` : ''}
 
 CRITICAL: Every component you create MUST follow these UI/UX principles exactly as specified. This is non-negotiable.`);
 
@@ -231,7 +458,7 @@ ${contextFiles.map(f => {
 }).join('\n')}`);
   }
   
-  sections.push(buildEditInstructions(editIntent.type));
+  sections.push(buildEditInstructions(editIntent.type, designSchema));
   
   if (editIntent.type === EditType.UPDATE_COMPONENT || 
       editIntent.type === EditType.ADD_FEATURE) {
@@ -292,10 +519,10 @@ ${manifest.routes.map(r =>
 }
 
 /**
- * Build edit-type specific instructions
+ * Build edit-type specific instructions with design schema awareness
  */
-function buildEditInstructions(editType) {
-  const instructions = {
+function buildEditInstructions(editType, designSchema = null) {
+  const baseInstructions = {
     [EditType.UPDATE_COMPONENT]: `## SURGICAL EDIT INSTRUCTIONS
 - You MUST preserve 99% of the original code
 - ONLY edit the specific component(s) mentioned
@@ -359,7 +586,21 @@ function buildEditInstructions(editType) {
 - Update any build configuration`,
   };
   
-  return instructions[editType] || instructions[EditType.UPDATE_COMPONENT];
+  let instructions = baseInstructions[editType] || baseInstructions[EditType.UPDATE_COMPONENT];
+  
+  // Add design schema specific instructions if available
+  if (designSchema && designSchema.schema) {
+    instructions += `
+
+## 🎨 DESIGN SCHEMA COMPLIANCE
+- **FOLLOW CSV SPECIFICATIONS** - Apply the design schema specifications to any new or modified components
+- **USE SPECIFIED COLORS** - Apply the color schemes from the CSV schema
+- **MAINTAIN TYPOGRAPHY** - Use the typography specifications as defined in the schema
+- **FOLLOW SPACING RULES** - Apply the spacing requirements from the schema
+- **IMPLEMENT IN ORDER** - If creating new components, follow the page structure order from the schema`;
+  }
+  
+  return instructions;
 }
 
 /**
@@ -418,20 +659,39 @@ export async function getFileContents(
 }
 
 /**
- * Format files for AI context
+ * Format files for AI context with design schema awareness
  */
 export function formatFilesForAI(
   primaryFiles,
-  contextFiles
+  contextFiles,
+  designSchema = null
 ) {
   const sections = [];
+  
+  // Add design schema context if available
+  if (designSchema && designSchema.schema) {
+    sections.push(`## 🎨 DESIGN SCHEMA CONTEXT
+**Source:** ${designSchema.url}
+**Schema ID:** ${designSchema.id}
+
+**CRITICAL:** Follow the design specifications from this schema when implementing any changes.
+
+${schemaToUIPrinciples(designSchema)}`);
+  }
   
   // Add primary files
   sections.push('## Files to Edit (ONLY OUTPUT THESE FILES)\n');
   sections.push('🚨 You MUST ONLY generate the files listed below. Do NOT generate any other files! 🚨\n');
   sections.push('⚠️ CRITICAL: Return the COMPLETE file - NEVER truncate with "..." or skip any lines! ⚠️\n');
   sections.push('The file MUST include ALL imports, ALL functions, ALL JSX, and ALL closing tags.\n');
-  sections.push('MUST follow the UI Design Principles exactly for any modifications.\n\n');
+  sections.push('MUST follow the UI Design Principles exactly for any modifications.\n');
+  
+  if (designSchema) {
+    sections.push('MUST follow the CSV design schema specifications for styling and structure.\n');
+  }
+  
+  sections.push('\n');
+  
   for (const [path, content] of Object.entries(primaryFiles)) {
     sections.push(`### ${path}
 **IMPORTANT: This is the COMPLETE file. Your output must include EVERY line shown below, modified only where necessary.**

@@ -1515,7 +1515,8 @@ Please create a complete React application following the UI/UX design principles
           prompt: finalPrompt,
           model: aiModel,
           context: fullContext,
-          isEdit: conversationContext.appliedCode.length > 0
+          isEdit: conversationContext.appliedCode.length > 0,
+          url: null // No URL provided - will use random CSV schema
         })
       });
 
@@ -2108,10 +2109,94 @@ Focus on the key sections and content, making it clean and modern while preservi
                     addChatMessage(text.trim(), 'ai');
                   }
                 } else if (data.type === 'stream' && data.raw) {
+                  setGenerationProgress(prev => {
+                    const newStreamedCode = prev.streamedCode + data.text;
+
+                    const updatedState = {
+                      ...prev,
+                      streamedCode: newStreamedCode,
+                      isStreaming: true,
+                      isThinking: false,
+                      status: 'Generating code...'
+                    };
+
+                    const fileRegex = /<file path="([^"]+)">([^]*?)<\/file>/g;
+                    let match;
+                    const processedFiles = new Set(prev.files.map(f => f.path));
+
+                    while ((match = fileRegex.exec(newStreamedCode)) !== null) {
+                      const filePath = match[1];
+                      const fileContent = match[2];
+
+                      if (!processedFiles.has(filePath)) {
+                        const fileExt = filePath.split('.').pop() || '';
+                        const fileType = fileExt === 'jsx' || fileExt === 'js' ? 'javascript' :
+                          fileExt === 'css' ? 'css' :
+                            fileExt === 'json' ? 'json' :
+                              fileExt === 'html' ? 'html' : 'text';
+
+                        const existingFileIndex = updatedState.files.findIndex(f => f.path === filePath);
+
+                        if (existingFileIndex >= 0) {
+                          updatedState.files = [
+                            ...updatedState.files.slice(0, existingFileIndex),
+                            {
+                              ...updatedState.files[existingFileIndex],
+                              content: fileContent.trim(),
+                              type: fileType,
+                              completed: true,
+                              edited: true
+                            },
+                            ...updatedState.files.slice(existingFileIndex + 1)
+                          ];
+                        } else {
+                          updatedState.files = [...updatedState.files, {
+                            path: filePath,
+                            content: fileContent.trim(),
+                            type: fileType,
+                            completed: true,
+                            edited: false
+                          }];
+                        }
+
+                        if (!prev.isEdit) {
+                          updatedState.status = `Completed ${filePath}`;
+                        }
+                        processedFiles.add(filePath);
+                      }
+                    }
+
+                    const lastFileMatch = newStreamedCode.match(/<file path="([^"]+)">([^]*?)$/);
+                    if (lastFileMatch && !lastFileMatch[0].includes('</file>')) {
+                      const filePath = lastFileMatch[1];
+                      const partialContent = lastFileMatch[2];
+
+                      if (!processedFiles.has(filePath)) {
+                        const fileExt = filePath.split('.').pop() || '';
+                        const fileType = fileExt === 'jsx' || fileExt === 'js' ? 'javascript' :
+                          fileExt === 'css' ? 'css' :
+                            fileExt === 'json' ? 'json' :
+                              fileExt === 'html' ? 'html' : 'text';
+
+                        updatedState.currentFile = {
+                          path: filePath,
+                          content: partialContent,
+                          type: fileType
+                        };
+                        if (!prev.isEdit) {
+                          updatedState.status = `Generating ${filePath}`;
+                        }
+                      }
+                    } else {
+                      updatedState.currentFile = undefined;
+                    }
+
+                    return updatedState;
+                  });
+                } else if (data.type === 'app') {
                   setGenerationProgress(prev => ({
                     ...prev,
-                    streamedCode: prev.streamedCode + data.text,
-                    lastProcessedPosition: prev.lastProcessedPosition || 0
+                    status: 'Generated App.jsx structure'
                   }));
                 } else if (data.type === 'component') {
                   setGenerationProgress(prev => ({
@@ -2122,7 +2207,12 @@ Focus on the key sections and content, making it clean and modern while preservi
                       path: data.path,
                       completed: true
                     }],
-                    currentComponent: prev.currentComponent + 1
+                    currentComponent: data.index
+                  }));
+                } else if (data.type === 'package') {
+                  setGenerationProgress(prev => ({
+                    ...prev,
+                    status: data.message || `Installing ${data.name}`
                   }));
                 } else if (data.type === 'complete') {
                   generatedCode = data.generatedCode;
@@ -2132,9 +2222,53 @@ Focus on the key sections and content, making it clean and modern while preservi
                     ...prev,
                     lastGeneratedCode: generatedCode
                   }));
+
+                  setGenerationProgress(prev => ({
+                    ...prev,
+                    isThinking: false,
+                    thinkingText: undefined,
+                    thinkingDuration: undefined
+                  }));
+
+                  if (data.packagesToInstall && data.packagesToInstall.length > 0) {
+                    console.log('[generate-code] Packages to install from tools:', data.packagesToInstall);
+                    (window).pendingPackages = data.packagesToInstall;
+                  }
+
+                  const fileRegex = /<file path="([^"]+)">([^]*?)<\/file>/g;
+                  const parsedFiles = [];
+                  let fileMatch;
+
+                  while ((fileMatch = fileRegex.exec(data.generatedCode)) !== null) {
+                    const filePath = fileMatch[1];
+                    const fileContent = fileMatch[2];
+                    const fileExt = filePath.split('.').pop() || '';
+                    const fileType = fileExt === 'jsx' || fileExt === 'js' ? 'javascript' :
+                      fileExt === 'css' ? 'css' :
+                        fileExt === 'json' ? 'json' :
+                          fileExt === 'html' ? 'html' : 'text';
+
+                    parsedFiles.push({
+                      path: filePath,
+                      content: fileContent.trim(),
+                      type: fileType,
+                      completed: true
+                    });
+                  }
+
+                  setGenerationProgress(prev => ({
+                    ...prev,
+                    status: `Generated ${parsedFiles.length > 0 ? parsedFiles.length : prev.files.length} file${(parsedFiles.length > 0 ? parsedFiles.length : prev.files.length) !== 1 ? 's' : ''}!`,
+                    isGenerating: false,
+                    isStreaming: false,
+                    isEdit: prev.isEdit,
+                    files: prev.files.length > 0 ? prev.files : parsedFiles
+                  }));
+                } else if (data.type === 'error') {
+                  throw new Error(data.error);
                 }
               } catch (e) {
-                console.error('Error parsing streaming data:', e);
+                console.error('Failed to parse SSE data:', e);
               }
             }
           }
@@ -2266,7 +2400,7 @@ Focus on the key sections and content, making it clean and modern while preservi
     const isUrl = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/.test(input);
     
     if (isUrl) {
-      // Handle URL input
+      // Handle URL input - will scrape and use design schema if available
       let displayUrl = input;
       if (!displayUrl.match(/^https?:\/\//i)) {
         displayUrl = 'https://' + displayUrl;
@@ -2385,7 +2519,8 @@ Focus on the key sections and content, making it clean and modern.`;
                 sandboxId: sandboxData?.sandboxId,
                 structure: structureContent,
                 conversationContext: conversationContext
-              }
+              },
+              url: url // Pass the URL to trigger scraping
             })
           });
 
@@ -2610,8 +2745,8 @@ Focus on the key sections and content, making it clean and modern.`;
         }
       }, 500);
     } else {
-      // Handle text input - generate from description
-      addChatMessage(`Generating website from description: "${input}"`, 'system');
+      // Handle non-URL input - will use random CSV schema without scraping
+      addChatMessage(`Creating a website based on your description: "${input}"`, 'system');
 
       const sandboxPromise = !sandboxData ? createSandbox(true) : Promise.resolve();
 
@@ -2630,12 +2765,12 @@ Focus on the key sections and content, making it clean and modern.`;
         try {
           setConversationContext(prev => ({
             ...prev,
-            currentProject: `Custom Website: ${input.substring(0, 50)}...`
+            currentProject: `Custom Website: ${input}`
           }));
 
-          const prompt = `Create a complete React application based on this description:
+          const prompt = `Create a modern, professional website based on this description:
 
-${input}
+"${input}"
 
 ${homeContextInput ? `ADDITIONAL CONTEXT/REQUIREMENTS FROM USER:
 ${homeContextInput}
@@ -2644,15 +2779,15 @@ Please incorporate these requirements into the design and implementation.` : ''}
 
 IMPORTANT INSTRUCTIONS:
 - Create a COMPLETE, working React application
+- Use a random design schema from the CSV file for inspiration
 - Use Tailwind CSS for all styling (no custom CSS files)
 - Make it responsive and modern
 - Create proper component structure
 - Make sure the app actually renders visible content
 - Create ALL components that you reference in imports
-- Follow the UI/UX design principles from the guidelines
 ${homeContextInput ? '- Apply the user\'s context/theme requirements throughout the application' : ''}
 
-Focus on creating a beautiful, functional website that matches the description.`;
+Focus on creating a beautiful, functional website based on the description.`;
 
           setGenerationProgress(prev => ({
             isGenerating: true,
@@ -2679,7 +2814,8 @@ Focus on creating a beautiful, functional website that matches the description.`
                 sandboxId: sandboxData?.sandboxId,
                 structure: structureContent,
                 conversationContext: conversationContext
-              }
+              },
+              url: null // No URL - will use random CSV schema
             })
           });
 
@@ -2687,7 +2823,6 @@ Focus on creating a beautiful, functional website that matches the description.`
             throw new Error('Failed to generate code');
           }
 
-          // Same streaming logic as URL handling
           const reader = aiResponse.body.getReader();
           const decoder = new TextDecoder();
           let generatedCode = '';
@@ -3241,6 +3376,276 @@ REQUIREMENTS:
 Focus on creating a website that embodies the business's brand identity and effectively communicates their unique value proposition to potential customers.`;
   };
 
+  // Add this function temporarily to test CSV parsing
+  const testCsvParsing = async () => {
+    try {
+      const response = await fetch('/api/test-csv-parsing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await response.json();
+      console.log('CSV Test Results:', data);
+    } catch (error) {
+      console.error('CSV Test Error:', error);
+    }
+  };
+
+  // Call this in useEffect or a button click to test
+  // testCsvParsing();
+
+  // Add the redesign function after the existing functions
+  const handleRedesign = async () => {
+    if (!sandboxData) {
+      addChatMessage('No active sandbox. Create a sandbox first!', 'system');
+      return;
+    }
+
+    setGenerationProgress(prev => ({
+      isGenerating: true,
+      status: 'Analyzing request and selecting different design schema...',
+      components: [],
+      currentComponent: 0,
+      streamedCode: '',
+      isStreaming: true,
+      isThinking: false,
+      thinkingText: undefined,
+      thinkingDuration: undefined,
+      files: prev.files || [],
+      currentFile: undefined,
+      lastProcessedPosition: 0
+    }));
+
+    setActiveTab('generation');
+
+    try {
+      // Update the redesign prompt to be more aggressive
+      const redesignPrompt = `🚨 COMPLETE REDESIGN REQUEST: Redesign this website from scratch using a DIFFERENT random design schema from the CSV file.
+
+CRITICAL REDESIGN INSTRUCTIONS:
+1. **SELECT A DIFFERENT RANDOM SCHEMA** from the CSV file (not the same one used before)
+2. **COMPLETELY REDESIGN THE ENTIRE WEBSITE** using the different schema's design system
+3. **CHANGE ALL VISUAL ELEMENTS** - colors, typography, spacing, layout, design patterns
+4. **KEEP ALL CONTENT AND FUNCTIONALITY** - only change the visual appearance
+5. **GENERATE COMPLETE NEW FILES** with the redesigned code
+6. **MAKE IT RESPONSIVE AND MODERN** with the new design
+
+WHAT YOU MUST DO:
+- **ANALYZE THE DIFFERENT RANDOM SCHEMA** - understand its complete design system
+- **REDESIGN HEADER** - apply new schema's navigation design and styling
+- **REDESIGN HERO** - apply new schema's hero section design and layout
+- **REDESIGN ALL SECTIONS** - apply new schema's component designs and styles
+- **REDESIGN FOOTER** - apply new schema's footer design and layout
+- **CHANGE ALL COLORS** - use the new schema's color palette throughout
+- **CHANGE ALL TYPOGRAPHY** - use the new schema's font styles and weights
+- **CHANGE ALL SPACING** - use the new schema's padding, margins, and layout
+- **GENERATE COMPLETE FILES** - create all redesigned components
+
+**MANDATORY:** This is a COMPLETE REDESIGN from scratch. You must transform the entire visual appearance using the different random schema. Do not keep the same design - create something completely new!`;
+
+      const response = await fetch('/api/generate-ai-code-stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: redesignPrompt,
+          model: aiModel,
+          context: {
+            sandboxId: sandboxData?.sandboxId,
+            structure: structureContent,
+            conversationContext: conversationContext,
+            currentFiles: sandboxFiles
+          },
+          isEdit: true, // This will trigger the redesign mode
+          url: null // Ensure we use intelligent CSV schema selection
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let generatedCode = '';
+      let explanation = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+
+                if (data.type === 'status') {
+                  setGenerationProgress(prev => ({ ...prev, status: data.message }));
+                } else if (data.type === 'thinking') {
+                  setGenerationProgress(prev => ({
+                    ...prev,
+                    isThinking: true,
+                    thinkingText: (prev.thinkingText || '') + data.text
+                  }));
+                } else if (data.type === 'thinking_complete') {
+                  setGenerationProgress(prev => ({
+                    ...prev,
+                    isThinking: false,
+                    thinkingDuration: data.duration
+                  }));
+                } else if (data.type === 'conversation') {
+                  let text = data.text || '';
+
+                  text = text.replace(/<package>[^<]*<\/package>/g, '');
+                  text = text.replace(/<packages>[^<]*<\/packages>/g, '');
+
+                  if (!text.includes('<file') && !text.includes('import React') &&
+                    !text.includes('export default') && !text.includes('className=') &&
+                    text.trim().length > 0) {
+                    addChatMessage(text.trim(), 'ai');
+                  }
+                } else if (data.type === 'stream' && data.raw) {
+                  setGenerationProgress(prev => {
+                    const newStreamedCode = prev.streamedCode + data.text;
+
+                    const updatedState = {
+                      ...prev,
+                      streamedCode: newStreamedCode,
+                      isStreaming: true,
+                      isThinking: false,
+                      status: 'Redesigning with intelligent schema...'
+                    };
+
+                    const fileRegex = /<file path="([^"]+)">([^]*?)<\/file>/g;
+                    let match;
+                    const processedFiles = new Set(prev.files.map(f => f.path));
+
+                    while ((match = fileRegex.exec(newStreamedCode)) !== null) {
+                      const filePath = match[1];
+                      const fileContent = match[2];
+
+                      if (!processedFiles.has(filePath)) {
+                        const fileExt = filePath.split('.').pop() || '';
+                        const fileType = fileExt === 'jsx' || fileExt === 'js' ? 'javascript' :
+                          fileExt === 'css' ? 'css' :
+                            fileExt === 'json' ? 'json' :
+                              fileExt === 'html' ? 'html' : 'text';
+
+                        const existingFileIndex = updatedState.files.findIndex(f => f.path === filePath);
+
+                        if (existingFileIndex >= 0) {
+                          updatedState.files = [
+                            ...updatedState.files.slice(0, existingFileIndex),
+                            {
+                              ...updatedState.files[existingFileIndex],
+                              content: fileContent.trim(),
+                              type: fileType,
+                              completed: true,
+                              edited: true
+                            },
+                            ...updatedState.files.slice(existingFileIndex + 1)
+                          ];
+                        } else {
+                          updatedState.files = [...updatedState.files, {
+                            path: filePath,
+                            content: fileContent.trim(),
+                            type: fileType,
+                            completed: true,
+                            edited: false
+                          }];
+                        }
+
+                        updatedState.status = `Redesigned ${filePath}`;
+                        processedFiles.add(filePath);
+                      }
+                    }
+
+                    return updatedState;
+                  });
+                } else if (data.type === 'component') {
+                  setGenerationProgress(prev => ({
+                    ...prev,
+                    status: `Redesigned ${data.name}`,
+                    components: [...prev.components, {
+                      name: data.name,
+                      path: data.path,
+                      completed: true
+                    }],
+                    currentComponent: data.index
+                  }));
+                } else if (data.type === 'complete') {
+                  generatedCode = data.generatedCode;
+                  explanation = data.explanation;
+
+                  setConversationContext(prev => ({
+                    ...prev,
+                    lastGeneratedCode: generatedCode
+                  }));
+
+                  setGenerationProgress(prev => ({
+                    ...prev,
+                    isThinking: false,
+                    thinkingText: undefined,
+                    thinkingDuration: undefined
+                  }));
+
+                  if (data.packagesToInstall && data.packagesToInstall.length > 0) {
+                    console.log('[redesign] Packages to install:', data.packagesToInstall);
+                    (window).pendingPackages = data.packagesToInstall;
+                  }
+
+                  const fileRegex = /<file path="([^"]+)">([^]*?)<\/file>/g;
+                  const parsedFiles = [];
+                  let fileMatch;
+
+                  while ((fileMatch = fileRegex.exec(generatedCode)) !== null) {
+                    parsedFiles.push({
+                      path: fileMatch[1],
+                      content: fileMatch[2].trim()
+                    });
+                  }
+
+                  if (parsedFiles.length > 0) {
+                    console.log('[redesign] Applying generated code with', parsedFiles.length, 'files');
+                    await applyGeneratedCode(generatedCode, true);
+                    addChatMessage(`Successfully redesigned the website using intelligent schema! ${parsedFiles.length} files updated.`, 'system');
+                  } else {
+                    addChatMessage('Redesign completed but no files were generated. Please try again.', 'system');
+                  }
+
+                  if (explanation && explanation.trim()) {
+                    addChatMessage(explanation, 'ai');
+                  }
+                }
+              } catch (e) {
+                console.error('Error parsing streaming data:', e);
+              }
+            }
+          }
+        }
+      }
+
+      setGenerationProgress(prev => ({
+        ...prev,
+        isGenerating: false,
+        isStreaming: false,
+        status: 'Redesign complete!'
+      }));
+
+    } catch (error) {
+      console.error('Redesign error:', error);
+      addChatMessage(`Redesign failed: ${error.message}`, 'system');
+      setGenerationProgress(prev => ({
+        ...prev,
+        isGenerating: false,
+        isStreaming: false,
+        status: 'Redesign failed'
+      }));
+    }
+  };
+
   return (
     <div className="font-sans bg-background text-foreground h-screen flex flex-col">
       {showHomeScreen && (
@@ -3420,6 +3825,24 @@ Focus on creating a website that embodies the business's brand identity and effe
               </option>
             ))}
           </select>
+          
+          {/* Add Redesign Button */}
+          {sandboxData && (
+            <Button
+              variant="code"
+              onClick={handleRedesign}
+              size="sm"
+              title="Redesign with intelligent schema"
+              disabled={generationProgress.isGenerating}
+              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0"
+            >
+              <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Redesign
+            </Button>
+          )}
+          
           <Button
             variant="code"
             onClick={() => createSandbox()}

@@ -7,7 +7,9 @@ import { selectFilesForEdit, getFileContents, formatFilesForAI } from '../../../
 import { executeSearchPlan, formatSearchResultsForAI, selectTargetFile } from '../../../lib/file-search-executor';
 import { getUIPrinciplesPrompt } from '../../../lib/ui-principles';
 import appConfig from '../../../../config/app.config';
-
+import { getRandomDesignSchema, getDifferentRandomDesignSchema, getDesignSchemaByUrl, extractDesignPatterns, schemaToUIPrinciples, getSchemaCount, testSchemaParsing, getSchemaUsageStats } from '../../../lib/design-schema-utils';
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 const groq = createGroq({
   apiKey: process.env.GROQ_API_KEY,
 });
@@ -57,14 +59,148 @@ function analyzeUserPreferences(messages) {
 
 export async function POST(request) {
   try {
-    const { prompt, model = 'openai/gpt-oss-20b', context, isEdit = false } = await request.json();
+    const { prompt, model = 'openai/gpt-oss-20b', context, isEdit = false, url: userProvidedUrl } = await request.json();
 
     console.log('[generate-ai-code-stream] Received request:');
     console.log('[generate-ai-code-stream] - prompt:', prompt);
     console.log('[generate-ai-code-stream] - isEdit:', isEdit);
+    console.log('[generate-ai-code-stream] - userProvidedUrl:', userProvidedUrl);
     console.log('[generate-ai-code-stream] - context.sandboxId:', context?.sandboxId);
     console.log('[generate-ai-code-stream] - context.currentFiles:', context?.currentFiles ? Object.keys(context.currentFiles) : 'none');
     console.log('[generate-ai-code-stream] - currentFiles count:', context?.currentFiles ? Object.keys(context.currentFiles).length : 0);
+
+    // Check if this is a redesign request
+    const isRedesign = prompt.toLowerCase().includes('redesign') && isEdit;
+    console.log('[generate-ai-code-stream] - isRedesign:', isRedesign);
+
+    // UPDATED LOGIC: Intelligently select the best design schema based on user query
+    let targetUrl = null;
+    let designSchema = null;
+    let csvData = null;
+    let shouldScrape = false;
+
+    // STEP 1: Intelligently select the best design schema from CSV based on user query
+    console.log('[generate-ai-code-stream] 🔍 Intelligently selecting best design schema from CSV...');
+    
+    // Test CSV parsing first
+    const csvTest = testSchemaParsing();
+    console.log('[generate-ai-code-stream] CSV Test Result:', csvTest);
+    
+    if (csvTest.success && csvTest.totalSchemas > 0) {
+      const userRequest = extractUserRequest(prompt);
+      console.log('[generate-ai-code-stream] Extracted user request:', userRequest);
+      
+      // Get schema usage statistics
+      const usageStats = getSchemaUsageStats();
+      console.log('[generate-ai-code-stream] Schema usage stats:', usageStats);
+      
+      // Use different schema selection for redesigns
+      if (isRedesign) {
+        console.log('[generate-ai-code-stream] 🎨 REDESIGN MODE: Selecting different schema to avoid repetition');
+        
+        // Get the last used schema ID to exclude it
+        const excludeIds = usageStats.lastUsedId ? [usageStats.lastUsedId] : [];
+        
+        // Try to get a different relevant schema first
+        designSchema = getDifferentRandomDesignSchema(userRequest, excludeIds);
+        
+        if (!designSchema) {
+          // Fallback to different random schema
+          designSchema = getDifferentRandomDesignSchema();
+        }
+      } else {
+        // Use intelligent schema selection for new generations
+        designSchema = getRandomDesignSchema();
+      }
+      
+      if (designSchema && designSchema.schema) {
+        csvData = designSchema.schema;
+        
+        console.log('[generate-ai-code-stream] ✅ SCHEMA SELECTED:');
+        console.log('[generate-ai-code-stream] - URL:', designSchema.url);
+        console.log('[generate-ai-code-stream] - Schema ID:', designSchema.id);
+        console.log('[generate-ai-code-stream] - Selection Method:', designSchema.queryAnalysis?.method || 'unknown');
+        console.log('[generate-ai-code-stream] - Total schemas available:', getSchemaCount());
+        console.log('[generate-ai-code-stream] - Schemas used so far:', usageStats.usedSchemas);
+        console.log('[generate-ai-code-stream] - Using CSV data for design schema');
+        
+        // Extract design patterns for better implementation guidance
+        const designPatterns = extractDesignPatterns(designSchema);
+        console.log('[generate-ai-code-stream] Extracted design patterns:', Object.keys(designPatterns));
+      } else {
+        console.warn('[generate-ai-code-stream] No schema found from selection');
+      }
+    } else {
+      console.warn('[generate-ai-code-stream] CSV parsing failed, proceeding without design schema');
+    }
+
+    // STEP 2: If user provided URL, ALSO scrape it for content
+    if (userProvidedUrl && userProvidedUrl.startsWith('http')) {
+      targetUrl = userProvidedUrl;
+      shouldScrape = true;
+      console.log('[generate-ai-code-stream] User provided URL, will also scrape for content:', targetUrl);
+    }
+
+    // Scrape the target URL ONLY if user provided a URL
+    let scrapedContent = null;
+    let screenshot = null;
+    let businessInfo = null;
+    
+    if (targetUrl && shouldScrape) {
+      try {
+        console.log('[generate-ai-code-stream] Scraping URL for content:', targetUrl);
+        
+        // Scrape the URL content
+        const scrapeResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/scrape-url-enhanced`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: targetUrl })
+        });
+
+        if (scrapeResponse.ok) {
+          const scrapeData = await scrapeResponse.json();
+          if (scrapeData.success) {
+            scrapedContent = scrapeData.content;
+            businessInfo = scrapeData.structured?.businessInfo;
+            console.log('[generate-ai-code-stream] Successfully scraped content from:', targetUrl);
+            console.log('[generate-ai-code-stream] Content length:', scrapedContent.length);
+            
+            if (businessInfo) {
+              console.log('[generate-ai-code-stream] Business info extracted:', businessInfo);
+            }
+          } else {
+            console.warn('[generate-ai-code-stream] Scraping failed:', scrapeData.error);
+          }
+        } else {
+          console.warn('[generate-ai-code-stream] Scraping request failed:', scrapeResponse.status);
+        }
+
+        // Get screenshot
+        const screenshotResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/scrape-screenshot`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: targetUrl })
+        });
+
+        if (screenshotResponse.ok) {
+          const screenshotData = await screenshotResponse.json();
+          if (screenshotData.success) {
+            screenshot = screenshotData.screenshot;
+            console.log('[generate-ai-code-stream] Successfully captured screenshot from:', targetUrl);
+          } else {
+            console.warn('[generate-ai-code-stream] Screenshot failed:', screenshotData.error);
+          }
+        } else {
+          console.warn('[generate-ai-code-stream] Screenshot request failed:', screenshotResponse.status);
+        }
+
+      } catch (error) {
+        console.warn('[generate-ai-code-stream] Failed to scrape URL:', error.message);
+        // Continue without scraped content - we'll still use the design schema
+      }
+    } else {
+      console.log('[generate-ai-code-stream] No URL provided or no scraping needed - using CSV design schema only');
+    }
 
     if (!global.conversationState) {
       global.conversationState = {
@@ -86,7 +222,16 @@ export async function POST(request) {
       content: prompt,
       timestamp: Date.now(),
       metadata: {
-        sandboxId: context?.sandboxId
+        sandboxId: context?.sandboxId,
+        targetUrl: targetUrl,
+        designSchema: designSchema ? { 
+          id: designSchema.id, 
+          url: designSchema.url,
+          scrapedContent: scrapedContent ? true : false,
+          screenshot: screenshot ? true : false,
+          csvData: csvData ? true : false
+        } : null,
+        businessInfo: businessInfo
       }
     };
     global.conversationState.context.messages.push(userMessage);
@@ -159,7 +304,7 @@ export async function POST(request) {
 
                 await sendProgress({
                   type: 'status',
-                  message: `🔎 Searching for: "${searchPlan.searchTerms.join('", "')}"`
+                  message: `🔍 Searching for: "${searchPlan.searchTerms.join('", "')}"`
                 });
 
                 const searchExecution = executeSearchPlan(searchPlan,
@@ -184,7 +329,7 @@ export async function POST(request) {
                   if (target) {
                     await sendProgress({
                       type: 'status',
-                      message: `✅ Found code in ${target.filePath.split('/').pop()} at line ${target.lineNumber}`
+                      message: `🔍 Found code in ${target.filePath.split('/').pop()} at line ${target.lineNumber}`
                     });
 
                     console.log('[generate-ai-code-stream] Target selected:', target);
@@ -223,7 +368,7 @@ User request: "${prompt}"`;
                   console.warn('[generate-ai-code-stream] Search found no results, falling back to broader context');
                   await sendProgress({
                     type: 'status',
-                    message: '⚠️ Could not find exact match, using broader search...'
+                    message: '🚫 Could not find exact match, using broader search...'
                   });
                 }
               } else {
@@ -233,7 +378,7 @@ User request: "${prompt}"`;
               console.error('[generate-ai-code-stream] Error in agentic search workflow:', error);
               await sendProgress({
                 type: 'status',
-                message: '⚠️ Search workflow error, falling back to keyword method...'
+                message: '🚫 Search workflow error, falling back to keyword method...'
               });
               if (manifest) {
                 editContext = selectFilesForEdit(prompt, manifest);
@@ -247,7 +392,7 @@ User request: "${prompt}"`;
               console.log('[generate-ai-code-stream] No manifest available for fallback');
               await sendProgress({
                 type: 'status',
-                message: '⚠️ No file manifest available, will use broad context'
+                message: '🚫 No file manifest available, will use broad context'
               });
             }
           }
@@ -523,133 +668,240 @@ ${context.documentDesignPrompt}
 **CRITICAL:** The website you create MUST reflect the business's unique value proposition and brand identity as specified above. Use the extracted color palette and font preferences when possible, while following the UI design principles below.`;
         }
 
-        const systemPrompt = getUIPrinciplesPrompt() + documentContext + `
+        // UPDATED SYSTEM PROMPT: Always prioritize CSV schema, then scraped content
+        let csvContext = '';
+        if (csvData) {
+          const designPatterns = extractDesignPatterns(designSchema);
+          
+          csvContext = `
 
-You are an expert React developer with perfect memory of the conversation. You maintain context across messages and remember scraped websites, generated components, and applied code.
+## 🎯 PRIMARY DESIGN GUIDE: CSV SCHEMA DATA
+
+**CRITICAL: This CSV schema is your PRIMARY design blueprint. Follow it exactly for UI/UX design.**
+
+### 🎨 Design Source: ${designSchema?.url || 'Random CSV Schema'}
+### 📊 Schema ID: ${designSchema?.id || 'N/A'}
+### 📈 Total Schemas Available: ${getSchemaCount()}
+
+**IMPLEMENTATION PRIORITY:**
+1. CSV Design Schema (PRIMARY - USE THIS FIRST)
+2. Scraped Content (SECONDARY - for content only)
+3. UI Principles (FALLBACK - general guidelines)
+
+${JSON.stringify(csvData, null, 2)}
+
+### 🧩 COMPONENT-BY-COMPONENT IMPLEMENTATION GUIDE:
+
+${(() => {
+  if (!csvData) return '';
+  
+  let instructions = '';
+  
+  // Extract component specifications
+  if (csvData.components) {
+    instructions += `\n### COMPONENT SPECIFICATIONS:\n`;
+    for (const [componentName, component] of Object.entries(csvData.components)) {
+      instructions += `\n**${componentName} Component:**\n`;
+      instructions += `- **Type:** ${component.type}\n`;
+      instructions += `- **Description:** ${component.description}\n`;
+      
+      if (component.typography) {
+        instructions += `- **Typography Requirements:**\n`;
+        for (const [element, typography] of Object.entries(component.typography)) {
+          instructions += `  - ${element}: ${typography.visual_description || typography.weight || 'default'}\n`;
+        }
+      }
+      
+      if (component.spacing) {
+        instructions += `- **Spacing:** Padding: ${component.spacing.padding || 'default'}, Margin: ${component.spacing.margin || 'default'}\n`;
+      }
+      
+      if (component.colors) {
+        instructions += `- **Color Scheme:**\n`;
+        instructions += `  - Background: ${component.colors.background}\n`;
+        instructions += `  - Text: ${component.colors.text}\n`;
+        instructions += `  - Accent: ${component.colors.accent}\n`;
+      }
+      
+      if (component.image_style) {
+        instructions += `- **Image Style:** ${component.image_style}\n`;
+      }
+      
+      if (component.other_visual_notes) {
+        instructions += `- **Visual Notes:** ${component.other_visual_notes}\n`;
+      }
+    }
+  }
+  
+  // Extract page structure
+  if (csvData.page_structure) {
+    instructions += `\n### 📄 PAGE STRUCTURE (IMPLEMENT IN THIS EXACT ORDER):\n`;
+    csvData.page_structure.forEach((item, index) => {
+      instructions += `${index + 1}. **${item.component}** - ${item.description || 'Component to be implemented'}\n`;
+    });
+  }
+  
+  // Extract design system
+  if (csvData.design_system) {
+    instructions += `\n### 🎨 DESIGN SYSTEM:\n`;
+    instructions += JSON.stringify(csvData.design_system, null, 2);
+  }
+  
+  // Extract layout guidelines
+  if (csvData.layout_guidelines) {
+    instructions += `\n### 📐 LAYOUT GUIDELINES:\n`;
+    instructions += JSON.stringify(csvData.layout_guidelines, null, 2);
+  }
+  
+  return instructions;
+})()}
+
+### CRITICAL IMPLEMENTATION RULES:
+
+1. **COMPONENT CREATION:** Create each component exactly as specified in the CSV schema
+2. **COLOR IMPLEMENTATION:** Use the exact color schemes specified for each component
+3. **TYPOGRAPHY:** Apply the typography specifications precisely as defined
+4. **SPACING:** Follow the padding and margin specifications exactly
+5. **PAGE STRUCTURE:** Implement components in the exact order specified in page_structure
+6. **VISUAL HIERARCHY:** Maintain the visual hierarchy as described in the schema
+7. **RESPONSIVE DESIGN:** Ensure all components work across all screen sizes
+8. **ACCESSIBILITY:** Maintain accessibility standards while following the design
+9. **DESIGN PATTERNS:** Follow the extracted design patterns consistently across all components
+10. **DESIGN SYSTEM:** Apply any design system rules and guidelines
+
+**MANDATORY:** Every component you create MUST follow the CSV schema specifications exactly. This is your primary design guide.`;
+        }
+
+        // Add scraped content context if available (SECONDARY to CSV schema)
+        let scrapedContext = '';
+        if (scrapedContent) {
+          scrapedContext = `
+
+## 📄 REAL WEBSITE CONTENT FROM ${targetUrl}:
+
+**IMPORTANT:** Use this content COMBINED with the CSV design schema above:
+
+${scrapedContent}
+
+**INSTRUCTIONS:**
+- Use the DESIGN STRUCTURE from the CSV schema above (PRIMARY)
+- Use the CONTENT/TEXT from this scraped website (SECONDARY)
+- Combine both to create an authentic website with proper design following CSV schema
+
+**Note:** The CSV schema defines HOW it should look, this content defines WHAT it should say.`;
+        }
+
+        // Add business info context if available
+        let businessContext = '';
+        if (businessInfo) {
+          businessContext = `
+
+## EXTRACTED BUSINESS INFORMATION:
+- **Business Name:** ${businessInfo.businessName || 'Not specified'}
+- **Unique Value Proposition:** ${businessInfo.uniqueValueProposition || 'Not specified'}
+- **Competitors:** ${businessInfo.competitors || 'Not specified'}
+- **Color Palette:** ${businessInfo.colorPalette || 'Professional and modern colors'}
+- **Preferred Font:** ${businessInfo.preferredFont || 'Clean, readable fonts'}
+
+**CRITICAL:** The website you create MUST reflect the business's unique value proposition and brand identity as specified above. Use the extracted color palette and font preferences when possible.`;
+        }
+
+        const systemPrompt = `You are an expert React developer creating modern web applications with Tailwind CSS.
+
+## CORE REQUIREMENTS:
+- Use React with Tailwind CSS
+- Mobile-first responsive design  
+- Semantic HTML5 elements
+- Use ONLY standard Tailwind classes (bg-white, text-black, bg-blue-500, NOT bg-background)
+- Component-based architecture
+- Create complete, functional components
+
+${csvData ? `🎯 **PRIMARY DESIGN SOURCE: ${isRedesign ? 'DIFFERENT ' : ''}INTELLIGENTLY SELECTED CSV SCHEMA**
+
+**CRITICAL INSTRUCTIONS:**
+1. **USE ${isRedesign ? 'DIFFERENT ' : ''}INTELLIGENTLY SELECTED CSV SCHEMA** - This schema was chosen based on your specific request${isRedesign ? ' and is different from the previous one' : ''}
+2. **IMPLEMENT EXACT COMPONENT SPECIFICATIONS** - Follow the component definitions precisely
+3. **FOLLOW PAGE STRUCTURE ORDER** - Implement components in the exact order specified
+4. **APPLY EXACT COLORS AND TYPOGRAPHY** - Use the specified color schemes and typography
+5. **MAINTAIN VISUAL HIERARCHY** - Follow the visual hierarchy as described in the schema
+${isRedesign ? '6. **REDESIGN MODE** - This is a redesign request. Apply the different CSV schema design to the existing content structure' : ''}
+
+**SELECTED SCHEMA ANALYSIS:**
+- **Source URL:** ${designSchema?.url || 'Unknown'}
+- **Schema ID:** ${designSchema?.id || 'N/A'}
+- **Selection Method:** ${designSchema?.queryAnalysis?.method || 'unknown'}
+- **Matched Keywords:** ${designSchema?.queryAnalysis?.matchedKeywords?.join(', ') || 'none'}
+- **Matched Categories:** ${designSchema?.queryAnalysis?.matchedCategories?.join(', ') || 'none'}
+${isRedesign ? `- **Previous Schema Excluded:** ${designSchema?.queryAnalysis?.excludedIds?.join(', ') || 'none'}` : ''}
+
+**IMPLEMENTATION PRIORITY:**
+1. ${isRedesign ? 'Different ' : ''}Intelligently Selected CSV Schema (PRIMARY - chosen based on your request${isRedesign ? ' and different from previous' : ''})
+2. Scraped Content (SECONDARY - provides real content/text)
+3. UI/UX Principles (GENERAL GUIDELINES)` : ''}
+
+${isRedesign ? `## 🎨 REDESIGN MODE - USING DIFFERENT INTELLIGENTLY SELECTED CSV SCHEMA
+
+**CRITICAL REDESIGN INSTRUCTIONS:**
+- You are redesigning an existing website using a DIFFERENT intelligently selected design schema from the CSV file
+- This schema was chosen because it best matches your redesign request AND is different from the previous schema used
+- Apply the design patterns, colors, and typography from the selected schema
+- Maintain the existing content and functionality
+- Create a completely new visual design while keeping the same content structure
+- Follow the CSV schema specifications exactly for the new design
+- Make it responsive and modern
+- Preserve all existing functionality and content
+- GENERATE COMPLETE FILES with the new design applied
+
+**Different Intelligently Selected Schema:** ${designSchema?.url || 'Unknown'}
+**Schema ID:** ${designSchema?.id || 'N/A'}
+**Selection Reason:** ${designSchema?.queryAnalysis?.matchedKeywords?.join(', ') || 'Best different match for your request'}
+**Previous Schema Excluded:** ${designSchema?.queryAnalysis?.excludedIds?.join(', ') || 'none'}
+
+**WHAT TO DO:**
+1. Look at the current website structure and content
+2. Apply the DIFFERENT intelligently selected CSV schema's design system to each component
+3. Update colors, typography, spacing, and layout according to the schema
+4. Keep all existing content, just redesign the visual appearance
+5. Generate complete, working files with the new design
+
+**MANDATORY:** You MUST generate complete files with the new design applied. Do not just describe the changes - actually create the redesigned code.` : ''}
+
+${targetUrl ? `TARGET WEBSITE: ${targetUrl}
+${scrapedContent ? 'You are recreating this website using intelligently selected CSV design schema for layout and real content for text.' : 'You are creating a website inspired by this URL.'}` : ''}
 
 ${conversationContext}
 
-## UI/UX DESIGN PRINCIPLES - FOLLOW THESE GUIDELINES STRICTLY
+${csvContext}
 
-### 1. Layout & Grids
-- Use a simple 12-column grid system to keep things neat and balanced
-- Keep elements aligned and organized like a clean desk - everything lines up nicely, no matter the screen size
-- Avoid wonky, misaligned stuff; it throws people off
+${scrapedContext}
 
-### 2. Typography
-- Pick 1-2 font families maximum (one for headlines, one for body text) to keep it clean
-- Make your main title pop (H1), use subheadings (H2-H4) for structure
-- Body text: Go for at least 16px - bump it up to 16-18px on mobile for easy reading
-- Line Height: Space lines out at 1.4-1.6 times the font size - gives text room to breathe
-- Letter Spacing: Keep normal text tight (~0em), but for all-caps headings, add a tiny bit (0.05-0.1em)
-- Alignment: Left-align body text for smooth reading; center short bits like titles or quotes
-- Contrast: Make sure text pops against the background - dark text on light or vice versa
-- Hierarchy: Play with size, weight, and spacing to guide the eye - big bold titles and smaller body text
-- Consistency: Set a type scale and stick with it across the site for a unified feel
+${businessContext}
 
-### 3. Color System
-- Follow 60-30-10 rule: 60% neutral, 30% main color, 10% accent
-- Primary Color: Your brand's main vibe - bold buttons, links, or highlights that scream "this is us!"
-- Secondary Color: The sidekick to your primary color, perfect for subtle accents. Sprinkle it lightly
-- Background Color: Keep it chill with neutral tones like light gray, white, or dark gray for a clean look
-- Text Color: Make sure it stands out sharp against the background
-- Accent Color: A fun pop for alerts, badges, or special touches. Go bold but don't overdo it - like hot sauce, a little goes a long way
-- State Colors: Green for "Yay, it worked!", red for "Oops, error!", yellow for warnings
+${documentContext}
 
-### 4. Spacing & White Space
-- Use a Spacing Scale: Stick to multiples of 4px or 8px (like 8, 16, 24px) - keeps everything tidy and consistent
-- Group Related Stuff: Keep things that belong together close, with tight gaps (8-16px)
-- Separate Sections: Give big sections breathing room with wider gaps (64-96px)
-- Make Text Easy to Read: Use enough line height and paragraph spacing so text doesn't feel cramped
-- Give Buttons Space: Leave room around your CTAs - makes them stand out and easier to click
-- Avoid a Messy Look: More space means less clutter, helping users focus and enjoy the experience
+${getUIPrinciplesPrompt()}
 
-### 5. Visual Hierarchy
-- Guide people's eyes naturally: big, bold stuff grabs attention first, then smaller details
-- Use size, color, and placement to highlight what matters most, like key info or buttons right up top
+**CRITICAL RULES - YOUR MOST IMPORTANT INSTRUCTIONS:**
 
-### 6. Navigation Systems
-- Keep it Simple and Consistent: Use familiar navigation patterns with clear, concise labels
-- Limit and Organize Menu Items: Stick to 5-7 main items and group related links logically
-- Ensure Visibility and Feedback: Highlight the current page or section
-- Make it Responsive and Accessible: Work seamlessly across devices, be keyboard-friendly, and support screen readers
-- Add Search for Larger Sites: Include a prominent search bar for content-rich websites
+${csvData ? `**${isRedesign ? 'DIFFERENT ' : ''}INTELLIGENTLY SELECTED CSV SCHEMA PRIORITY:**
+1. **FOLLOW ${isRedesign ? 'DIFFERENT ' : ''}INTELLIGENTLY SELECTED SCHEMA EXACTLY** - This schema was chosen based on your specific request${isRedesign ? ' and is different from the previous one' : ''}
+2. **IMPLEMENT COMPONENTS IN ORDER** - Follow the page_structure sequence precisely
+3. **USE SPECIFIED COLORS AND TYPOGRAPHY** - Apply the exact color schemes and typography from the schema
+4. **MAINTAIN COMPONENT SPECIFICATIONS** - Follow the component definitions exactly as written
+5. **COMBINE WITH UI PRINCIPLES** - Use general UI principles to enhance the CSV specifications
+${isRedesign ? '6. **REDESIGN MODE** - Apply the different intelligently selected schema design to existing content structure' : ''}
+6. **USE SCRAPED CONTENT FOR TEXT** - If available, use real content from scraped website with CSV design` : ''}
 
-### 7. Buttons & CTAs
-- Make Them Pop: Use bold, contrasting colors and subtle shadows to stand out. Keep it clear, not flashy
-- Clear, Action-Oriented Labels: Stick to short, snappy text like "Sign Up" or "Shop Now"
-- Right Size & Spacing: Aim for 44x44px minimum (mobile-friendly), with 8-16px padding and 24px gaps around
-- Add Feedback: Include hover effects or quick animations (200-300ms) to show clicks
-- Stay Accessible & Consistent: Ensure high contrast (4.5:1), keyboard-friendly focus states, and uniform styles
-
-### 8. Icons & Images
-- Use consistent stroke width, corner radius, and perspective for icons
-- Maintain uniform icon grid (typically 24x24px or 32x32px)
-- Align icons to text baselines when inline with labels
-- Go for crisp vector icons (SVGs) and high-resolution but optimized images
-- Match your brand's vibe - whether it's warm, professional, or luxe
-- Skip blurry or generic stock photos; they cheapen the look
-- Hero Images: High-resolution but optimized; should visually reinforce the page's purpose
-- Thumbnails: Small previews, cropped appropriately, used in lists or galleries
-- Avatars/Profiles: Circular or square; fallback default images when none are provided
-
-### 9. Motion & Animation Guidelines
-- Motion and animation enhance user experience by guiding attention, providing feedback, and making interactions feel smooth and intuitive
-- Animations should be purposeful, consistent, and timed appropriately - usually between 200ms to 500ms
-- Use natural easing functions to create fluid transitions
-- Micro-interactions offer real-time feedback
-- Keep animations subtle to avoid overwhelming users
-- Ensure accessibility by respecting motion preferences
-- Prioritize performance by using efficient properties like transform and opacity
-- When used thoughtfully, motion can elevate both usability and visual appeal
-
-### 10. Form Design & Validation
-- Input field styling (normal, focused, error, success)
-- Consistent spacing and label placements
-- Clear error messages and validation patterns
-
-### 11. Consistency
-- Reuse colors, fonts, and button styles everywhere
-- Builds trust and feels familiar, like walking into your favorite coffee shop
-- A style guide can help keep things on track
-
-### 12. Feedback & Interactions
-- Add little touches like hover effects or loading animations to show users what's happening
-- Think "Message Sent!" pop-ups or buttons that glow when clicked - it's fun and reassuring
-
-### 13. Responsiveness
-- Start designing for phones first, then scale up (mobile-first approach)
-- Use breakpoints (768px, 1024px) for layout adjustments
-- Make sure everything looks great and works smoothly on all screens
-
-## IMPLEMENTATION REQUIREMENTS
-
-When creating React components:
-1. **ALWAYS** use Tailwind CSS classes that follow these exact principles
-2. **ALWAYS** implement responsive design with mobile-first approach
-3. **ALWAYS** use semantic HTML5 elements
-4. **ALWAYS** ensure accessibility (ARIA labels, keyboard navigation)
-5. **ALWAYS** follow the 60-30-10 color rule and spacing scale (8px, 16px, 24px, 64px, 96px)
-6. **ALWAYS** create smooth animations and transitions (200-500ms)
-7. **ALWAYS** maintain visual hierarchy and consistency
-8. **ALWAYS** use the 12-column grid system approach
-9. **ALWAYS** ensure 16-18px minimum text size
-10. **ALWAYS** implement proper button sizing (44x44px minimum)
-
-CRITICAL: Every component you create MUST follow these UI/UX principles exactly as specified. This is non-negotiable.
-
-🚨 CRITICAL RULES - YOUR MOST IMPORTANT INSTRUCTIONS:
 1. **DO EXACTLY WHAT IS ASKED - NOTHING MORE, NOTHING LESS**
    - Don't add features not requested
    - Don't fix unrelated issues
    - Don't improve things not mentioned
 2. **CHECK App.jsx FIRST** - ALWAYS see what components exist before creating new ones
-3. **NAVIGATION LIVES IN Header.jsx** - Don't create Nav.jsx if Header exists with nav
-4. **USE STANDARD TAILWIND CLASSES ONLY**:
+3. **USE STANDARD TAILWIND CLASSES ONLY**:
    - ✅ CORRECT: bg-white, text-black, bg-blue-500, bg-gray-100, text-gray-900
    - ❌ WRONG: bg-background, text-foreground, bg-primary, bg-muted, text-secondary
    - Use ONLY classes from the official Tailwind CSS documentation
-5. **FILE COUNT LIMITS**:
+4. **FILE COUNT LIMITS**:
    - Simple style/text change = 1 file ONLY
    - New component = 2 files MAX (component + parent)
    - If >3 files, YOU'RE DOING TOO MUCH
@@ -666,320 +918,34 @@ PACKAGE USAGE RULES:
 - Only add routing if building a multi-page application
 - Common packages are auto-installed from your imports
 
-WEBSITE CLONING REQUIREMENTS:
-When recreating/cloning a website, you MUST include:
+WEBSITE REQUIREMENTS:
+When creating a website, you MUST include:
 1. **Header with Navigation** - Usually Header.jsx containing nav
 2. **Hero Section** - The main landing area (Hero.jsx)
 3. **Main Content Sections** - Features, Services, About, etc.
 4. **Footer** - Contact info, links, copyright (Footer.jsx)
-5. **App.jsx** - Main app component that imports and uses all components
 
-${isEdit ? `CRITICAL: THIS IS AN EDIT TO AN EXISTING APPLICATION
+${csvData ? `🎨 **${isRedesign ? 'DIFFERENT ' : ''}INTELLIGENTLY SELECTED CSV SCHEMA IMPLEMENTATION CHECKLIST:**
+- [ ] Implement all components specified in the ${isRedesign ? 'different ' : ''}intelligently selected CSV schema
+- [ ] Follow the exact page structure order
+- [ ] Apply the specified color schemes for each component
+- [ ] Use the typography specifications as defined
+- [ ] Maintain the spacing and layout requirements
+- [ ] Ensure responsive design across all components
+- [ ] Follow the visual hierarchy as described
+- [ ] Implement any special visual notes or requirements
+${isRedesign ? '- [ ] Apply redesign to existing content structure using different intelligently selected schema' : ''}
+- [ ] Use scraped content for text/content if available` : ''}
 
-YOU MUST FOLLOW THESE EDIT RULES:
-0. NEVER create tailwind.config.js, vite.config.js, package.json, or any other config files - they already exist!
-1. DO NOT regenerate the entire application
-2. DO NOT create files that already exist (like App.jsx, index.css, tailwind.config.js)
-3. ONLY edit the EXACT files needed for the requested change - NO MORE, NO LESS
-4. If the user says "update the header", ONLY edit the Header component - DO NOT touch Footer, Hero, or any other components
-5. If the user says "change the color", ONLY edit the relevant style or component file - DO NOT "improve" other parts
-6. If you're unsure which file to edit, choose the SINGLE most specific one related to the request
-7. IMPORTANT: When adding new components or libraries:
-   - Create the new component file
-   - UPDATE ONLY the parent component that will use it
-   - Example: Adding a Newsletter component means:
-     * Create Newsletter.jsx
-     * Update ONLY the file that will use it (e.g., Footer.jsx OR App.jsx) - NOT both
-8. When adding npm packages:
-   - Import them ONLY in the files where they're actually used
-   - The system will auto-install missing packages
+${isRedesign ? ` **REDESIGN MODE CRITICAL REQUIREMENTS:**
+- You MUST generate complete files with the new design
+- Do not just describe changes - CREATE THE ACTUAL CODE
+- Apply the DIFFERENT intelligently selected CSV schema design to existing components
+- Keep all content and functionality intact
+- Only change the visual design and styling
+- Generate ALL necessary files with the new design applied
+- This schema is DIFFERENT from the previous one used` : ''}`;
 
-CRITICAL FILE MODIFICATION RULES - VIOLATION = FAILURE:
-- **NEVER TRUNCATE FILES** - Always return COMPLETE files with ALL content
-- **NO ELLIPSIS (...)** - Include every single line of code, no skipping
-- Files MUST be complete and runnable - include ALL imports, functions, JSX, and closing tags
-- Count the files you're about to generate
-- If the user asked to change ONE thing, you should generate ONE file (or at most two if adding a new component)
-- DO NOT "fix" or "improve" files that weren't mentioned in the request
-- DO NOT update multiple components when only one was requested
-- DO NOT add features the user didn't ask for
-- RESIST the urge to be "helpful" by updating related files
-
-CRITICAL: DO NOT REDESIGN OR REIMAGINE COMPONENTS
-- "update" means make a small change, NOT redesign the entire component
-- "change X to Y" means ONLY change X to Y, nothing else
-- "fix" means repair what's broken, NOT rewrite everything
-- "remove X" means delete X from the existing file, NOT create a new file
-- "delete X" means remove X from where it currently exists
-- Preserve ALL existing functionality and design unless explicitly asked to change it
-
-NEVER CREATE NEW FILES WHEN THE USER ASKS TO REMOVE/DELETE SOMETHING
-If the user says "remove X", you must:
-1. Find which existing file contains X
-2. Edit that file to remove X
-3. DO NOT create any new files
-
-${editContext ? `
-TARGETED EDIT MODE ACTIVE
-- Edit Type: ${editContext.editIntent.type}
-- Confidence: ${editContext.editIntent.confidence}
-- Files to Edit: ${editContext.primaryFiles.join(', ')}
-
-🚨 CRITICAL RULE - VIOLATION WILL RESULT IN FAILURE 🚨
-YOU MUST ***ONLY*** GENERATE THE FILES LISTED ABOVE!
-
-ABSOLUTE REQUIREMENTS:
-1. COUNT the files in "Files to Edit" - that's EXACTLY how many files you must generate
-2. If "Files to Edit" shows ONE file, generate ONLY that ONE file
-3. DO NOT generate App.jsx unless it's EXPLICITLY listed in "Files to Edit"
-4. DO NOT generate ANY components that aren't listed in "Files to Edit"
-5. DO NOT "helpfully" update related files
-6. DO NOT fix unrelated issues you notice
-7. DO NOT improve code quality in files not being edited
-8. DO NOT add bonus features
-
-EXAMPLE VIOLATIONS (THESE ARE FAILURES):
-❌ User says "update the hero" → You update Hero, Header, Footer, and App.jsx
-❌ User says "change header color" → You redesign the entire header
-❌ User says "fix the button" → You update multiple components
-❌ Files to Edit shows "Hero.jsx" → You also generate App.jsx "to integrate it"
-❌ Files to Edit shows "Header.jsx" → You also update Footer.jsx "for consistency"
-
-CORRECT BEHAVIOR (THIS IS SUCCESS):
-✅ User says "update the hero" → You ONLY edit Hero.jsx with the requested change
-✅ User says "change header color" → You ONLY change the color in Header.jsx
-✅ User says "fix the button" → You ONLY fix the specific button issue
-✅ Files to Edit shows "Hero.jsx" → You generate ONLY Hero.jsx
-✅ Files to Edit shows "Header.jsx, Nav.jsx" → You generate EXACTLY 2 files: Header.jsx and Nav.jsx
-
-THE AI INTENT ANALYZER HAS ALREADY DETERMINED THE FILES.
-DO NOT SECOND-GUESS IT.
-DO NOT ADD MORE FILES.
-ONLY OUTPUT THE EXACT FILES LISTED IN "Files to Edit".
-` : ''}
-
-VIOLATION OF THESE RULES WILL RESULT IN FAILURE!
-` : ''}
-
-CRITICAL INCREMENTAL UPDATE RULES:
-- When the user asks for additions or modifications (like "add a videos page", "create a new component", "update the header"):
-  - DO NOT regenerate the entire application
-  - DO NOT recreate files that already exist unless explicitly asked
-  - ONLY create/modify the specific files needed for the requested change
-  - Preserve all existing functionality and files
-  - If adding a new page/route, integrate it with the existing routing system
-  - Reference existing components and styles rather than duplicating them
-  - NEVER recreate config files (tailwind.config.js, vite.config.js, package.json, etc.)
-
-IMPORTANT: When the user asks for edits or modifications:
-- You have access to the current file contents in the context
-- Make targeted changes to existing files rather than regenerating everything
-- Preserve the existing structure and only modify what's requested
-- If you need to see a specific file that's not in context, mention it
-
-IMPORTANT: You have access to the full conversation context including:
-- Previously scraped websites and their content
-- Components already generated and applied
-- The current project being worked on
-- Recent conversation history
-- Any Vite errors that need to be resolved
-
-When the user references "the app", "the website", or "the site" without specifics, refer to:
-1. The most recently scraped website in the context
-2. The current project name in the context
-3. The files currently in the sandbox
-
-If you see scraped websites in the context, you're working on a clone/recreation of that site.
-
-CRITICAL UI/UX RULES:
-- NEVER use emojis in any code, text, console logs, or UI elements
-- ALWAYS ensure responsive design using proper Tailwind classes (sm:, md:, lg:, xl:)
-- ALWAYS use proper mobile-first responsive design patterns
-- NEVER hardcode pixel widths - use relative units and responsive classes
-- ALWAYS test that the layout works on mobile devices (320px and up)
-- ALWAYS make sections full-width by default - avoid max-w-7xl or similar constraints
-- For full-width layouts: use className="w-full" or no width constraint at all
-- Only add max-width constraints when explicitly needed for readability (like blog posts)
-- Prefer system fonts and clean typography
-- Ensure all interactive elements have proper hover/focus states
-- Use proper semantic HTML elements for accessibility
-
-CRITICAL STYLING RULES - MUST FOLLOW:
-- NEVER use inline styles with style={{ }} in JSX
-- NEVER use <style jsx> tags or any CSS-in-JS solutions
-- NEVER create App.css, Component.css, or any component-specific CSS files
-- NEVER import './App.css' or any CSS files except index.css
-- ALWAYS use Tailwind CSS classes for ALL styling
-- ONLY create src/index.css with the @tailwind directives
-- The ONLY CSS file should be src/index.css with:
-  @tailwind base;
-  @tailwind components;
-  @tailwind utilities;
-- Use Tailwind's full utility set: spacing, colors, typography, flexbox, grid, animations, etc.
-- ALWAYS add smooth transitions and animations where appropriate:
-  - Use transition-all, transition-colors, transition-opacity for hover states
-  - Use animate-fade-in, animate-pulse, animate-bounce for engaging UI elements
-  - Add hover:scale-105 or hover:scale-110 for interactive elements
-  - Use transform and transition utilities for smooth interactions
-- For complex layouts, combine Tailwind utilities rather than writing custom CSS
-- NEVER use non-standard Tailwind classes like "border-border", "bg-background", "text-foreground", etc.
-- Use standard Tailwind classes only:
-  - For borders: use "border-gray-200", "border-gray-300", etc. NOT "border-border"
-  - For backgrounds: use "bg-white", "bg-gray-100", etc. NOT "bg-background"
-  - For text: use "text-gray-900", "text-black", etc. NOT "text-foreground"
-- Examples of good Tailwind usage:
-  - Buttons: className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 hover:shadow-lg transform hover:scale-105 transition-all duration-200"
-  - Cards: className="bg-white rounded-lg shadow-md p-6 border border-gray-200 hover:shadow-xl transition-shadow duration-300"
-  - Full-width sections: className="w-full px-4 sm:px-6 lg:px-8"
-  - Constrained content (only when needed): className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
-  - Dark backgrounds: className="min-h-screen bg-gray-900 text-white"
-  - Hero sections: className="animate-fade-in-up"
-  - Feature cards: className="transform hover:scale-105 transition-transform duration-300"
-  - CTAs: className="animate-pulse hover:animate-none"
-
-CRITICAL STRING AND SYNTAX RULES:
-- ALWAYS escape apostrophes in strings: use \' instead of ' or use double quotes
-- ALWAYS escape quotes properly in JSX attributes
-- NEVER use curly quotes or smart quotes ('' "" '' "") - only straight quotes (' ")
-- ALWAYS convert smart/curly quotes to straight quotes:
-  - ' and ' → '
-  - " and " → "
-  - Any other Unicode quotes → straight quotes
-- When strings contain apostrophes, either:
-  1. Use double quotes: "you're" instead of 'you're'
-  2. Escape the apostrophe: 'you\'re'
-- When working with scraped content, ALWAYS sanitize quotes first
-- Replace all smart quotes with straight quotes before using in code
-- Be extra careful with user-generated content or scraped text
-- Always validate that JSX syntax is correct before generating
-
-CRITICAL CODE SNIPPET DISPLAY RULES:
-- When displaying code examples in JSX, NEVER put raw curly braces { } in text
-- ALWAYS wrap code snippets in template literals with backticks
-- For code examples in components, use one of these patterns:
-  1. Template literals: <div>{\`const example = { key: 'value' }\`}</div>
-  2. Pre/code blocks: <pre><code>{\`your code here\`}</code></pre>
-  3. Escape braces: <div>{'{'}key: value{'}'}</div>
-- NEVER do this: <div>const example = { key: 'value' }</div> (causes parse errors)
-- For multi-line code snippets, always use:
-  <pre className="bg-gray-900 text-gray-100 p-4 rounded">
-    <code>{\`
-      // Your code here
-      const example = {
-        key: 'value'
-      }
-    \`}</code>
-  </pre>
-
-CRITICAL: When asked to create a React app or components:
-- ALWAYS CREATE ALL FILES IN FULL - never provide partial implementations
-- ALWAYS CREATE EVERY COMPONENT that you import - no placeholders
-- ALWAYS IMPLEMENT COMPLETE FUNCTIONALITY - don't leave TODOs unless explicitly asked
-- If you're recreating a website, implement ALL sections and features completely
-- NEVER create tailwind.config.js - it's already configured in the template
-- ALWAYS include a Navigation/Header component (Nav.jsx or Header.jsx) - websites need navigation!
-
-REQUIRED COMPONENTS for website clones:
-1. Nav.jsx or Header.jsx - Navigation bar with links (NEVER SKIP THIS!)
-2. Hero.jsx - Main landing section
-3. Features/Services/Products sections - Based on the site content
-4. Footer.jsx - Footer with links and info
-5. App.jsx - Main component that imports and arranges all components
-- NEVER create vite.config.js - it's already configured in the template
-- NEVER create package.json - it's already configured in the template
-
-WHEN WORKING WITH SCRAPED CONTENT:
-- ALWAYS sanitize all text content before using in code
-- Convert ALL smart quotes to straight quotes
-- Example transformations:
-  - "Firecrawl's API" → "Firecrawl's API" or "Firecrawl\\'s API"
-  - 'It's amazing' → "It's amazing" or 'It\\'s amazing'
-  - "Best tool ever" → "Best tool ever"
-- When in doubt, use double quotes for strings containing apostrophes
-- For testimonials or quotes from scraped content, ALWAYS clean the text:
-  - Bad: content: 'Moved our internal agent's web scraping...'
-  - Good: content: "Moved our internal agent's web scraping..."
-  - Also good: content: 'Moved our internal agent\\'s web scraping...'
-
-When generating code, FOLLOW THIS PROCESS:
-1. ALWAYS generate src/index.css FIRST - this establishes the styling foundation
-2. List ALL components you plan to import in App.jsx
-3. Count them - if there are 10 imports, you MUST create 10 component files
-4. Generate src/index.css first (with proper CSS reset and base styles)
-5. Generate App.jsx second
-6. Then generate EVERY SINGLE component file you imported
-7. Do NOT stop until all imports are satisfied
-
-Use this XML format for React components only (DO NOT create tailwind.config.js - it already exists):
-
-<file path="src/index.css">
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-</file>
-
-<file path="src/App.jsx">
-// Main App component that imports and uses other components
-// Use Tailwind classes: className="min-h-screen bg-gray-50"
-</file>
-
-<file path="src/components/Example.jsx">
-// Your React component code here
-// Use Tailwind classes for ALL styling
-</file>
-
-CRITICAL COMPLETION RULES:
-1. NEVER say "I'll continue with the remaining components"
-2. NEVER say "Would you like me to proceed?"
-3. NEVER use <continue> tags
-4. Generate ALL components in ONE response
-5. If App.jsx imports 10 components, generate ALL 10
-6. Complete EVERYTHING before ending your response
-
-With 16,000 tokens available, you have plenty of space to generate a complete application. Use it!
-
-UNDERSTANDING USER INTENT FOR INCREMENTAL VS FULL GENERATION:
-- "add/create/make a [specific feature]" → Add ONLY that feature to existing app
-- "add a videos page" → Create ONLY Videos.jsx and update routing
-- "update the header" → Modify ONLY header component
-- "fix the styling" → Update ONLY the affected components
-- "change X to Y" → Find the file containing X and modify it
-- "make the header black" → Find Header component and change its color
-- "rebuild/recreate/start over" → Full regeneration
-- Default to incremental updates when working on an existing app
-
-SURGICAL EDIT RULES (CRITICAL FOR PERFORMANCE):
-- **PREFER TARGETED CHANGES**: Don't regenerate entire components for small edits
-- For color/style changes: Edit ONLY the specific className or style prop
-- For text changes: Change ONLY the text content, keep everything else
-- For adding elements: INSERT into existing JSX, don't rewrite the whole return
-- **PRESERVE EXISTING CODE**: Keep all imports, functions, and unrelated code exactly as-is
-- Maximum files to edit:
-  - Style change = 1 file ONLY
-  - Text change = 1 file ONLY
-  - New feature = 2 files MAX (feature + parent)
-- If you're editing >3 files for a simple request, STOP - you're doing too much
-
-EXAMPLES OF CORRECT SURGICAL EDITS:
-✅ "change header to black" → Find className="..." in Header.jsx, change ONLY color classes
-✅ "update hero text" → Find the <h1> or <p> in Hero.jsx, change ONLY the text inside
-✅ "add a button to hero" → Find the return statement, ADD button, keep everything else
-❌ WRONG: Regenerating entire Header.jsx to change one color
-❌ WRONG: Rewriting Hero.jsx to add one button
-
-NAVIGATION/HEADER INTELLIGENCE:
-- ALWAYS check App.jsx imports first
-- Navigation is usually INSIDE Header.jsx, not separate
-- If user says "nav", check Header.jsx FIRST
-- Only create Nav.jsx if no navigation exists anywhere
-- Logo, menu, hamburger = all typically in Header
-
-CRITICAL: When files are provided in the context:
-1. The user is asking you to MODIFY the existing app, not create a new one
-2. Find the relevant file(s) from the provided context
-3. Generate ONLY the files that need changes
-4. Do NOT ask to see files - they are already provided in the context above
-5. Make the requested change immediately`;
         // Build full prompt with context
         let fullPrompt = prompt;
         if (context) {
@@ -1170,8 +1136,8 @@ CRITICAL: When files are provided in the context:
             contextParts.push('<file path="src/index.css">');
             contextParts.push('/* CSS content here */');
             contextParts.push('</file>');
-            contextParts.push('\n❌ NEVER OUTPUT: "Generated Files: index.css, App.jsx"');
-            contextParts.push('❌ NEVER LIST FILE NAMES WITHOUT CONTENT');
+            contextParts.push('\n⚠️ NEVER OUTPUT: "Generated Files: index.css, App.jsx"');
+            contextParts.push('⚠️ NEVER LIST FILE NAMES WITHOUT CONTENT');
             contextParts.push('✅ ALWAYS: One <file> tag per file with COMPLETE content');
             contextParts.push('✅ ALWAYS: Include EVERY file you modified');
           } else if (!hasBackendFiles) {
@@ -1182,6 +1148,7 @@ CRITICAL: When files are provided in the context:
             contextParts.push('3. **COMPLETE COMPONENTS** - Header, Hero, Features, Footer minimum');
             contextParts.push('4. **VISUAL POLISH** - Shadows, hover states, transitions');
             contextParts.push('5. **STANDARD CLASSES** - bg-white, text-gray-900, bg-blue-500, NOT bg-background');
+            contextParts.push('6. **FOLLOW CSV SCHEMA** - If available, follow the design specifications exactly');
             contextParts.push('\nCreate a polished, professional application that works perfectly on first load.');
             contextParts.push('\n⚠️ OUTPUT FORMAT:');
             contextParts.push('Use <file path="...">content</file> tags for EVERY file');
@@ -1253,10 +1220,10 @@ PACKAGE RULES:
 - NEVER install packages like @mendable/firecrawl-js unless explicitly requested
 
 Examples of SYNTAX ERRORS (NEVER DO THIS):
-❌ className="px-4 py-2 bg-blue-600 hover:bg-blue-7...
-❌ <button className="btn btn-primary btn-...
-❌ const title = "Welcome to our...
-❌ import { useState, useEffect, ... } from 'react'
+⚠️ className="px-4 py-2 bg-blue-600 hover:bg-blue-7...
+⚠️ <button className="btn btn-primary btn-...
+⚠️ const title = "Welcome to our...
+⚠️ import { useState, useEffect, ... } from 'react'
 
 Examples of CORRECT CODE (ALWAYS DO THIS):
 ✅ className="px-4 py-2 bg-blue-600 hover:bg-blue-700"
@@ -1277,7 +1244,7 @@ You MUST include the closing </file> tag and ALL the code in between.
 
 NEVER write partial code like:
 <h1>Build and deploy on the AI Cloud.</h1>
-<p>Some text...</p>  ❌ WRONG
+<p>Some text...</p>  ⚠️ WRONG
 
 ALWAYS write complete code:
 <h1>Build and deploy on the AI Cloud.</h1>
@@ -1631,6 +1598,15 @@ Provide the complete file content without any truncation. Include all necessary 
                   completionClient = groq;
                 }
 
+                const modelMapping = {
+                  'anthropic/claude-3-5-sonnet-20241022': 'claude-3-5-sonnet-20241022',
+                  'anthropic/claude-3-5-haiku-20241022': 'claude-3-5-haiku-20241022',
+                  'groq/llama-3.1-70b-versatile': 'llama-3.1-70b-versatile',
+                  'groq/llama-3.1-8b-instant': 'llama-3.1-8b-instant'
+                };
+
+                const isGPT5 = model.startsWith('openai/gpt-5');
+
                 const completionResult = await streamText({
                   model: completionClient(modelMapping[model] || model),
                   messages: [
@@ -1640,8 +1616,8 @@ Provide the complete file content without any truncation. Include all necessary 
                     },
                     { role: 'user', content: completionPrompt }
                   ],
-                  temperature: isGPT5 ? undefined : appConfig.ai.defaultTemperature,
-                  maxTokens: appConfig.ai.truncationRecoveryMaxTokens
+                  temperature: isGPT5 ? undefined : (appConfig?.ai?.defaultTemperature || 0.7),
+                  maxTokens: appConfig?.ai?.truncationRecoveryMaxTokens || 4096
                 });
 
                 let completedContent = '';
@@ -1757,4 +1733,47 @@ Provide the complete file content without any truncation. Include all necessary 
       error: error.message
     }, { status: 500 });
   }
+}
+
+/**
+ * Extract the actual user request from the prompt
+ */
+function extractUserRequest(prompt) {
+  // Remove common prefixes and extract the core request
+  let userRequest = prompt;
+  
+  // Remove common AI instruction prefixes
+  const prefixesToRemove = [
+    'Create a modern, professional website based on this description:',
+    'Generate a website based on the uploaded business document requirements:',
+    'I want to recreate the',
+    'I scraped this website and want you to recreate it as a modern React application.',
+    'Please create a complete React application following the UI/UX design principles and the extracted business information.',
+    'IMPORTANT INSTRUCTIONS:',
+    'Focus on creating a beautiful, functional website based on the description.',
+    'Create a COMPLETE, working React application',
+    'Use a random design schema from the CSV file for inspiration',
+    'Use Tailwind CSS for all styling (no custom CSS files)',
+    'Make it responsive and modern',
+    'Create proper component structure',
+    'Make sure the app actually renders visible content',
+    'Create ALL components that you reference in imports'
+  ];
+  
+  for (const prefix of prefixesToRemove) {
+    userRequest = userRequest.replace(prefix, '').trim();
+  }
+  
+  // Remove quotes and extra whitespace
+  userRequest = userRequest.replace(/^["']|["']$/g, '').trim();
+  
+  // If the request is still very long, take just the first sentence
+  if (userRequest.length > 200) {
+    const firstSentence = userRequest.split(/[.!?]/)[0];
+    if (firstSentence.length > 10) {
+      userRequest = firstSentence.trim();
+    }
+  }
+  
+  return userRequest || 'website';
 }
