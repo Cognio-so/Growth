@@ -203,6 +203,58 @@ export function testSchemaParsing() {
   return schemas.length > 0;
 }
 
+// Add the missing debugCsvStructure function
+export function debugCsvStructure() {
+  const filePath = resolveCsvPath();
+  if (!filePath) {
+    return {
+      success: false,
+      error: 'CSV file not found'
+    };
+  }
+
+  try {
+    const content = fs.readFileSync(filePath, 'utf8');
+    const lines = content.split('\n');
+    
+    // Analyze CSV structure
+    const analysis = {
+      totalLines: lines.length,
+      totalSize: content.length,
+      firstFewLines: lines.slice(0, 5),
+      schemaPatterns: [],
+      jsonBlocks: 0
+    };
+
+    // Count JSON blocks
+    const jsonBlockRegex = /```json\r?\n/g;
+    let match;
+    while ((match = jsonBlockRegex.exec(content)) !== null) {
+      analysis.jsonBlocks++;
+    }
+
+    // Find schema patterns
+    const headerRegex = /(?:^|\r?\n)(\d+),([^,\r\n]+),"```json\r?\n/g;
+    while ((match = headerRegex.exec(content)) !== null) {
+      analysis.schemaPatterns.push({
+        id: parseInt(match[1]),
+        url: match[2]
+      });
+    }
+
+    return {
+      success: true,
+      filePath,
+      analysis
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
 function extractUserRequest(prompt) {
   let userRequest = prompt;
   
