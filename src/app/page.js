@@ -400,6 +400,13 @@ function AISandboxPageContent() {
         setTimeout(async () => {
           try {
             console.log('[createSandbox] Ensuring Vite server is running...');
+            
+            // Add check to ensure sandbox is ready
+            if (!global.activeSandbox) {
+              console.log('[createSandbox] Sandbox not ready yet, skipping Vite restart');
+              return;
+            }
+            
             const restartResponse = await fetch('/api/restart-vite', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' }
