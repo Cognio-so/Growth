@@ -3419,15 +3419,15 @@ Focus on creating a website that embodies the business's brand identity and effe
 
     try {
       // Enhanced redesign prompt with stronger instructions for complete UI/UX restructuring
-      const redesignPrompt = `🚨 COMPLETE REBUILD & REPLACE: Recreate this website from scratch with a new design, new content, and new functionality.
+      const redesignPrompt = ` COMPLETE REBUILD & REPLACE: Recreate this website from scratch with a new design, new content, and new functionality.
 
 **CRITICAL INSTRUCTIONS - OVERRIDE ALL PREVIOUS CONTEXT:**
-1.  **DELETE & REPLACE:** Your first action is to completely remove/delete all existing files.
-2.  **SELECT A DESIGN SCHEMA:** Choose a random design schema from the CSV file to define the new visual style.
-3.  **REBUILD FROM SCRATCH:** Generate entirely new files from a blank slate.
-4.  **REPLACE ALL VISUALS:** Using the new schema, create a new visual identity—colors, typography, spacing, layout, and components.
-5.  **REPLACE ALL CONTENT & FUNCTIONALITY:** Discard all original text and features. Generate new, relevant placeholder content and introduce improved functionalities appropriate for the new design.
-6.  **ENSURE RESPONSIVENESS:** The new build must be modern and fully responsive.
+1. **DELETE & REPLACE:** Your first action is to completely remove/delete all existing files.
+2. **SELECT A DESIGN SCHEMA:** Choose a random design schema from the CSV file to define the new visual style.
+3. **REBUILD FROM SCRATCH:** Generate entirely new files from a blank slate.
+4. **REPLACE ALL VISUALS:** Using the new schema, create a new visual identity—colors, typography, spacing, layout, and components.
+5. **REPLACE ALL CONTENT & FUNCTIONALITY:** Discard all original text and features. Generate new, relevant placeholder content and introduce improved functionalities appropriate for the new design.
+6. **ENSURE RESPONSIVENESS:** The new build must be modern and fully responsive.
 
 **EXECUTION WORKFLOW - FULL-SCOPE REIMAGINATION:**
 - **FILE OPERATION:** Discard all old code and files entirely. Start fresh.
@@ -3449,9 +3449,9 @@ Focus on creating a website that embodies the business's brand identity and effe
             sandboxId: sandboxData?.sandboxId,
             structure: structureContent,
             conversationContext: conversationContext,
-            currentFiles: sandboxFiles
+            currentFiles: {} // Empty object to ensure no existing files are referenced
           },
-          isEdit: false, // Changed from true to false - this prevents the system from providing existing files and preservation instructions
+          isEdit: false, // CRITICAL FIX: Set to false to prevent edit mode
           url: null // Ensure we use intelligent CSV schema selection
         })
       });
@@ -3606,8 +3606,9 @@ Focus on creating a website that embodies the business's brand identity and effe
 
                   if (parsedFiles.length > 0) {
                     console.log('[redesign] Applying generated code with', parsedFiles.length, 'files');
-                    await applyGeneratedCode(generatedCode, true);
-                    addChatMessage(`Successfully redesigned the website using intelligent schema! ${parsedFiles.length} files updated.`, 'system');
+                    // CRITICAL FIX: Use isEdit: false to ensure complete rebuild
+                    await applyGeneratedCode(generatedCode, false);
+                    addChatMessage(`Successfully redesigned the website using intelligent schema! ${parsedFiles.length} files created from scratch.`, 'system');
                   } else {
                     addChatMessage('Redesign completed but no files were generated. Please try again.', 'system');
                   }

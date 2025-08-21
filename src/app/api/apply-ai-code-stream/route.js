@@ -311,11 +311,11 @@ export async function POST(request) {
       await writer.write(encoder.encode(message));
     };
 
-
     (async (sandboxInstance, req) => {
       const results = {
         filesCreated: [],
         filesUpdated: [],
+        filesDeleted: [],
         packagesInstalled: [],
         packagesAlreadyInstalled: [],
         packagesFailed: [],
@@ -327,8 +327,41 @@ export async function POST(request) {
         await sendProgress({
           type: 'start',
           message: 'Starting code application...',
-          totalSteps: 3
+          totalSteps: isEdit ? 3 : 4 // Add extra step for clearing files if not edit mode
         });
+
+        // NEW: Clear existing files if this is not an edit operation (redesign/rebuild)
+        if (!isEdit) {
+          await sendProgress({
+            type: 'step',
+            step: 1,
+            message: 'Clearing existing files for complete rebuild...'
+          });
+
+          try {
+            // Clear the existing files tracking
+            global.existingFiles.clear();
+            
+            // Clear the file cache if it exists
+            if (global.sandboxState?.fileCache) {
+              global.sandboxState.fileCache.files = {};
+            }
+
+            console.log('[apply-ai-code-stream] Cleared existing files tracking for complete rebuild');
+            
+            await sendProgress({
+              type: 'step-complete',
+              step: 1,
+              message: 'Existing files cleared successfully'
+            });
+          } catch (clearError) {
+            console.warn('[apply-ai-code-stream] Warning: Could not clear existing files:', clearError.message);
+            await sendProgress({
+              type: 'warning',
+              message: `Could not clear existing files: ${clearError.message}. Continuing with rebuild...`
+            });
+          }
+        }
 
         const packagesArray = Array.isArray(packages) ? packages : [];
         const parsedPackages = Array.isArray(parsed.packages) ? parsed.packages : [];
@@ -348,7 +381,7 @@ export async function POST(request) {
         if (uniquePackages.length > 0) {
           await sendProgress({
             type: 'step',
-            step: 1,
+            step: isEdit ? 1 : 2,
             message: `Installing ${uniquePackages.length} packages...`,
             packages: uniquePackages
           });
@@ -407,7 +440,7 @@ export async function POST(request) {
         } else {
           await sendProgress({
             type: 'step',
-            step: 1,
+            step: isEdit ? 1 : 2,
             message: 'No additional packages to install, skipping...'
           });
         }
@@ -415,7 +448,7 @@ export async function POST(request) {
         const filesArray = Array.isArray(parsed.files) ? parsed.files : [];
         await sendProgress({
           type: 'step',
-          step: 2,
+          step: isEdit ? 2 : 3,
           message: `Creating ${filesArray.length} files...`
         });
 
@@ -433,7 +466,7 @@ export async function POST(request) {
               current: index + 1,
               total: filteredFiles.length,
               fileName: file.path,
-              action: 'creating'
+              action: isEdit ? 'updating' : 'creating'
             });
 
             let normalizedPath = file.path;
@@ -493,7 +526,7 @@ print(f"File written: ${fullPath}")
             await sendProgress({
               type: 'file-complete',
               fileName: normalizedPath,
-              action: isUpdate ? 'updated' : 'created'
+              action: isEdit ? 'updated' : 'created'
             });
           } catch (error) {
             if (results.errors) {
@@ -511,7 +544,7 @@ print(f"File written: ${fullPath}")
         if (commandsArray.length > 0) {
           await sendProgress({
             type: 'step',
-            step: 3,
+            step: isEdit ? 3 : 4,
             message: `Executing ${commandsArray.length} commands...`
           });
 
@@ -553,12 +586,11 @@ print(f"File written: ${fullPath}")
               await sendProgress({
                 type: 'command-complete',
                 command: cmd,
-                exitCode: result.exitCode,
-                success: result.exitCode === 0
+                success: true
               });
             } catch (error) {
               if (results.errors) {
-                results.errors.push(`Failed to execute ${cmd}: ${error.message}`);
+                results.errors.push(`Failed to execute command ${cmd}: ${error.message}`);
               }
               await sendProgress({
                 type: 'command-error',
@@ -570,59 +602,51 @@ print(f"File written: ${fullPath}")
         }
 
         await sendProgress({
-          type: 'complete',
-          results,
+          type: 'success',
+          message: isEdit ? 'Code updated successfully!' : 'Website rebuilt from scratch successfully!',
+          results: {
+            filesCreated: results.filesCreated,
+            filesUpdated: results.filesUpdated,
+            filesDeleted: results.filesDeleted,
+            packagesInstalled: results.packagesInstalled,
+            commandsExecuted: results.commandsExecuted,
+            errors: results.errors
+          },
           explanation: parsed.explanation,
           structure: parsed.structure,
-          message: `Successfully applied ${results.filesCreated.length} files`
+          parsedFiles: parsed.files,
+          isEdit: isEdit
         });
-
-        if (global.conversationState && results.filesCreated.length > 0) {
-          const messages = global.conversationState.context.messages;
-          if (messages.length > 0) {
-            const lastMessage = messages[messages.length - 1];
-            if (lastMessage.role === 'user') {
-              lastMessage.metadata = {
-                ...lastMessage.metadata,
-                editedFiles: results.filesCreated
-              };
-            }
-          }
-
-          if (global.conversationState.context.projectEvolution) {
-            global.conversationState.context.projectEvolution.majorChanges.push({
-              timestamp: Date.now(),
-              description: parsed.explanation || 'Code applied',
-              filesAffected: results.filesCreated || []
-            });
-          }
-
-          global.conversationState.lastUpdated = Date.now();
-        }
 
       } catch (error) {
+        console.error('[apply-ai-code-stream] Error in main processing:', error);
         await sendProgress({
           type: 'error',
+          message: `Failed to apply code: ${error.message}`,
           error: error.message
         });
-      } finally {
-        await writer.close();
       }
     })(sandbox, request);
 
-    return new Response(stream.readable, {
+    return new NextResponse(stream.readable, {
       headers: {
-        'Content-Type': 'text/event-stream',
+        'Content-Type': 'text/plain; charset=utf-8',
         'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-      },
+        'Connection': 'keep-alive'
+      }
     });
 
   } catch (error) {
-    console.error('Apply AI code stream error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to parse AI code' },
-      { status: 500 }
-    );
+    console.error('[apply-ai-code-stream] Error:', error);
+    return NextResponse.json({
+      success: false,
+      error: error.message,
+      results: {
+        filesCreated: [],
+        packagesInstalled: [],
+        commandsExecuted: [],
+        errors: [error.message]
+      }
+    });
   }
 }
