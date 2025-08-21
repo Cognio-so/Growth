@@ -39,51 +39,110 @@ function parseAIResponse(response) {
     return packages;
   }
 
+  // FIXED: More robust file parsing that handles conversational text and truncated content
   const fileMap = new Map();
 
-  const fileRegex = /<file path="([^"]+)">([\s\S]*?)(?:<\/file>|$)/g;
+  // First, try to find complete file blocks
+  const fileRegex = /<file path="([^"]+)">([\s\S]*?)<\/file>/g;
   let match;
   while ((match = fileRegex.exec(response)) !== null) {
     const filePath = match[1];
     const content = match[2].trim();
-    const hasClosingTag = response.substring(match.index, match.index + match[0].length).includes('</file>');
-
-    const existing = fileMap.get(filePath);
-
-    let shouldReplace = false;
-    if (!existing) {
-      shouldReplace = true;
-    } else if (!existing.isComplete && hasClosingTag) {
-      shouldReplace = true;
-      console.log(`[apply-ai-code-stream] Replacing incomplete ${filePath} with complete version`);
-    } else if (existing.isComplete && hasClosingTag && content.length > existing.content.length) {
-      shouldReplace = true;
-      console.log(`[apply-ai-code-stream] Replacing ${filePath} with longer complete version`);
-    } else if (!existing.isComplete && !hasClosingTag && content.length > existing.content.length) {
-      shouldReplace = true;
+    
+    // Skip empty or very short content
+    if (content.length < 10) {
+      console.warn(`[apply-ai-code-stream] Skipping file ${filePath} with very short content: ${content.length} chars`);
+      continue;
     }
 
-    if (shouldReplace) {
-      if (content.includes('...') && !content.includes('...props') && !content.includes('...rest')) {
-        console.warn(`[apply-ai-code-stream] Warning: ${filePath} contains ellipsis, may be truncated`);
-        if (!existing) {
-          fileMap.set(filePath, { content, isComplete: hasClosingTag });
-        }
-      } else {
-        fileMap.set(filePath, { content, isComplete: hasClosingTag });
+    fileMap.set(filePath, { content, isComplete: true });
+    console.log(`[apply-ai-code-stream] Found complete file: ${filePath} (${content.length} chars)`);
+  }
+
+  // If no complete files found, try to find incomplete file blocks
+  if (fileMap.size === 0) {
+    console.log('[apply-ai-code-stream] No complete files found, looking for incomplete file blocks...');
+    
+    const incompleteFileRegex = /<file path="([^"]+)">([\s\S]*?)$/g;
+    while ((match = incompleteFileRegex.exec(response)) !== null) {
+      const filePath = match[1];
+      const content = match[2].trim();
+      
+      if (content.length > 50) { // Only accept files with substantial content
+        fileMap.set(filePath, { content, isComplete: false });
+        console.log(`[apply-ai-code-stream] Found incomplete file: ${filePath} (${content.length} chars)`);
       }
     }
   }
 
+  // If still no files found, try to extract from conversational text
+  if (fileMap.size === 0) {
+    console.log('[apply-ai-code-stream] No file blocks found, attempting to extract from conversational text...');
+    
+    // Look for code blocks that might be files
+    const codeBlockRegex = /```(?:jsx?|tsx?|javascript|typescript)?\n([\s\S]*?)```/g;
+    while ((match = codeBlockRegex.exec(response)) !== null) {
+      const content = match[1].trim();
+      
+      // Try to determine if this is a React component
+      if (content.includes('import React') || content.includes('export default') || content.includes('function') || content.includes('const')) {
+        // Try to extract filename from content or use a default
+        let fileName = 'Component.jsx';
+        
+        // Look for component name in the content
+        const componentMatch = content.match(/(?:function|const)\s+(\w+)/);
+        if (componentMatch) {
+          fileName = `${componentMatch[1]}.jsx`;
+        }
+        
+        // Look for export default name
+        const exportMatch = content.match(/export\s+default\s+(\w+)/);
+        if (exportMatch) {
+          fileName = `${exportMatch[1]}.jsx`;
+        }
+        
+        const filePath = `src/components/${fileName}`;
+        
+        if (!fileMap.has(filePath)) {
+          fileMap.set(filePath, { content, isComplete: true });
+          console.log(`[apply-ai-code-stream] Extracted component from code block: ${filePath}`);
+        }
+      }
+    }
+  }
+
+  // Process found files
   for (const [path, { content, isComplete }] of fileMap.entries()) {
     if (!isComplete) {
       console.log(`[apply-ai-code-stream] Warning: File ${path} appears to be truncated (no closing tag)`);
+      
+      // Try to complete the file content if it looks like it was cut off
+      if (content.includes('import') && !content.includes('export default') && !content.includes('export {')) {
+        console.log(`[apply-ai-code-stream] Attempting to complete truncated file: ${path}`);
+        
+        // Add a basic export if missing
+        let completedContent = content;
+        if (!completedContent.includes('export default')) {
+          const componentName = path.split('/').pop().replace('.jsx', '').replace('.js', '');
+          completedContent += `\n\nexport default ${componentName};`;
+        }
+        
+        sections.files.push({
+          path,
+          content: completedContent
+        });
+      } else {
+        sections.files.push({
+          path,
+          content
+        });
+      }
+    } else {
+      sections.files.push({
+        path,
+        content
+      });
     }
-
-    sections.files.push({
-      path,
-      content
-    });
 
     const filePackages = extractPackagesFromCode(content);
     for (const pkg of filePackages) {
@@ -94,24 +153,31 @@ function parseAIResponse(response) {
     }
   }
 
+  // FIXED: Better handling of markdown file blocks
   const markdownFileRegex = /```(?:file )?path="([^"]+)"\n([\s\S]*?)```/g;
   while ((match = markdownFileRegex.exec(response)) !== null) {
     const filePath = match[1];
     const content = match[2].trim();
-    sections.files.push({
-      path: filePath,
-      content: content
-    });
+    
+    // Only add if not already processed
+    if (!sections.files.some(f => f.path === filePath)) {
+      sections.files.push({
+        path: filePath,
+        content: content
+      });
+      console.log(`[apply-ai-code-stream] Found markdown file block: ${filePath}`);
+    }
 
     const filePackages = extractPackagesFromCode(content);
     for (const pkg of filePackages) {
       if (!sections.packages.includes(pkg)) {
         sections.packages.push(pkg);
-        console.log(`[apply-ai-code-stream] 📦 Package detected from imports: ${pkg}`);
+        console.log(`[apply-ai-code-stream] 📦 Package detected from markdown imports: ${pkg}`);
       }
     }
   }
 
+  // FIXED: Better handling of generated files from plain text
   const generatedFilesMatch = response.match(/Generated Files?:\s*([^\n]+)/i);
   if (generatedFilesMatch) {
     const filesList = generatedFilesMatch[1]
@@ -127,12 +193,15 @@ function parseAIResponse(response) {
         const codeMatch = fileContentMatch[0].match(/^(import[\s\S]+)$/m);
         if (codeMatch) {
           const filePath = fileName.includes('/') ? fileName : `src/components/${fileName}`;
-          sections.files.push({
-            path: filePath,
-            content: codeMatch[1].trim()
-          });
-          console.log(`[apply-ai-code-stream] Extracted content for ${filePath}`);
-
+          
+          // Only add if not already processed
+          if (!sections.files.some(f => f.path === filePath)) {
+            sections.files.push({
+              path: filePath,
+              content: codeMatch[1].trim()
+            });
+            console.log(`[apply-ai-code-stream] Extracted content for ${filePath}`);
+          }
 
           const filePackages = extractPackagesFromCode(codeMatch[1]);
           for (const pkg of filePackages) {
@@ -146,6 +215,7 @@ function parseAIResponse(response) {
     }
   }
 
+  // FIXED: Better code block extraction
   const codeBlockRegex = /```(?:jsx?|tsx?|javascript|typescript)?\n([\s\S]*?)```/g;
   while ((match = codeBlockRegex.exec(response)) !== null) {
     const content = match[1].trim();
@@ -159,22 +229,25 @@ function parseAIResponse(response) {
           path: filePath,
           content: content
         });
+        console.log(`[apply-ai-code-stream] Extracted file from code block: ${filePath}`);
+      }
 
-        const filePackages = extractPackagesFromCode(content);
-        for (const pkg of filePackages) {
-          if (!sections.packages.includes(pkg)) {
-            sections.packages.push(pkg);
-          }
+      const filePackages = extractPackagesFromCode(content);
+      for (const pkg of filePackages) {
+        if (!sections.packages.includes(pkg)) {
+          sections.packages.push(pkg);
         }
       }
     }
   }
 
+  // Extract commands
   const cmdRegex = /<command>(.*?)<\/command>/g;
   while ((match = cmdRegex.exec(response)) !== null) {
     sections.commands.push(match[1].trim());
   }
 
+  // Extract packages
   const pkgRegex = /<package>(.*?)<\/package>/g;
   while ((match = pkgRegex.exec(response)) !== null) {
     sections.packages.push(match[1].trim());
@@ -190,22 +263,30 @@ function parseAIResponse(response) {
     sections.packages.push(...packagesList);
   }
 
+  // Extract structure
   const structureMatch = /<structure>([\s\S]*?)<\/structure>/;
   const structResult = response.match(structureMatch);
   if (structResult) {
     sections.structure = structResult[1].trim();
   }
 
+  // Extract explanation
   const explanationMatch = /<explanation>([\s\S]*?)<\/explanation>/;
   const explResult = response.match(explanationMatch);
   if (explResult) {
     sections.explanation = explResult[1].trim();
   }
 
-  const templateMatch = /<template>(.*?)<\/template>/;
-  const templResult = response.match(templateMatch);
-  if (templResult) {
-    sections.template = templResult[1].trim();
+  // FIXED: Better logging for debugging
+  console.log(`[apply-ai-code-stream] Parsing results:`);
+  console.log(`[apply-ai-code-stream] - Files found: ${sections.files.length}`);
+  console.log(`[apply-ai-code-stream] - Packages found: ${sections.packages.length}`);
+  console.log(`[apply-ai-code-stream] - Commands found: ${sections.commands.length}`);
+  
+  if (sections.files.length > 0) {
+    sections.files.forEach((file, index) => {
+      console.log(`[apply-ai-code-stream] - File ${index + 1}: ${file.path} (${file.content.length} chars)`);
+    });
   }
 
   return sections;
