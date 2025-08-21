@@ -327,10 +327,10 @@ export async function POST(request) {
         await sendProgress({
           type: 'start',
           message: 'Starting code application...',
-          totalSteps: isEdit ? 3 : 4 // Add extra step for clearing files if not edit mode
+          totalSteps: isEdit ? 3 : 4
         });
 
-        // NEW: Clear existing files if this is not an edit operation (redesign/rebuild)
+        // FIXED: Clear existing files if this is not an edit operation (redesign/rebuild)
         if (!isEdit) {
           await sendProgress({
             type: 'step',
@@ -339,6 +339,11 @@ export async function POST(request) {
           });
 
           try {
+            // FIXED: Ensure existingFiles is properly initialized before clearing
+            if (!global.existingFiles) {
+              global.existingFiles = new Set();
+            }
+            
             // Clear the existing files tracking
             global.existingFiles.clear();
             
@@ -424,6 +429,7 @@ export async function POST(request) {
                         results.packagesInstalled = data.installedPackages;
                       }
                     } catch (e) {
+                      // Silent error handling for malformed JSON
                     }
                   }
                 }
@@ -458,6 +464,11 @@ export async function POST(request) {
           const fileName = (file.path || '').split('/').pop() || '';
           return !configFiles.includes(fileName);
         });
+
+        // FIXED: Ensure existingFiles is properly initialized before file processing
+        if (!global.existingFiles) {
+          global.existingFiles = new Set();
+        }
 
         for (const [index, file] of filteredFiles.entries()) {
           try {
