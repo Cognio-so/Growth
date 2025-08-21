@@ -2582,7 +2582,7 @@ Focus on the key sections and content, making it clean and modern.`;
                               ...updatedState.files.slice(0, existingFileIndex),
                               {
                                 ...updatedState.files[existingFileIndex],
-                                content: fileContent.trim(),
+                                content: partialContent.trim(),
                                 type: fileType,
                                 completed: true,
                                 edited: true
@@ -2592,7 +2592,7 @@ Focus on the key sections and content, making it clean and modern.`;
                           } else {
                             updatedState.files = [...updatedState.files, {
                               path: filePath,
-                              content: fileContent.trim(),
+                              content: partialContent.trim(),
                               type: fileType,
                               completed: true,
                               edited: false
@@ -2897,7 +2897,7 @@ Focus on creating a beautiful, functional website based on the description.`;
                               ...updatedState.files.slice(0, existingFileIndex),
                               {
                                 ...updatedState.files[existingFileIndex],
-                                content: fileContent.trim(),
+                                content: partialContent.trim(),
                                 type: fileType,
                                 completed: true,
                                 edited: true
@@ -2907,7 +2907,7 @@ Focus on creating a beautiful, functional website based on the description.`;
                           } else {
                             updatedState.files = [...updatedState.files, {
                               path: filePath,
-                              content: fileContent.trim(),
+                              content: partialContent.trim(),
                               type: fileType,
                               completed: true,
                               edited: false
@@ -3225,7 +3225,7 @@ I'll now generate a website based on these requirements and our UI design princi
                             ...updatedState.files.slice(0, existingFileIndex),
                             {
                               ...updatedState.files[existingFileIndex],
-                              content: fileContent.trim(),
+                              content: partialContent.trim(),
                               type: fileType,
                               completed: true,
                               edited: true
@@ -3235,7 +3235,7 @@ I'll now generate a website based on these requirements and our UI design princi
                         } else {
                           updatedState.files = [...updatedState.files, {
                             path: filePath,
-                            content: fileContent.trim(),
+                            content: partialContent.trim(),
                             type: fileType,
                             completed: true,
                             edited: false
