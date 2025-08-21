@@ -452,6 +452,19 @@ Tip: I automatically detect and install npm packages from your code imports (lik
     setLoadingStage('applying');
     log('Applying AI-generated code...');
 
+    // Add safety checks at the beginning
+    if (!sandboxData?.url) {
+      console.error('[applyGeneratedCode] No sandbox URL available');
+      addChatMessage('Error: No active sandbox. Please create a sandbox first.', 'system');
+      return;
+    }
+
+    if (!iframeRef.current) {
+      console.error('[applyGeneratedCode] Iframe ref not available');
+      addChatMessage('Error: Preview not ready. Please wait for sandbox to load.', 'system');
+      return;
+    }
+
     try {
       setCodeApplicationState({ stage: 'analyzing' });
 
@@ -846,6 +859,8 @@ Tip: I automatically detect and install npm packages from your code imports (lik
                 console.error('[applyGeneratedCode] No iframe or sandbox URL available for refresh');
               }
             }, refreshDelay); // Dynamic delay based on whether packages were installed
+          } else {
+            console.warn('[applyGeneratedCode] Skipping iframe refresh - iframe or sandbox not ready');
           }
 
         } else {
