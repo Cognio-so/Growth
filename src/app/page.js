@@ -400,13 +400,6 @@ function AISandboxPageContent() {
         setTimeout(async () => {
           try {
             console.log('[createSandbox] Ensuring Vite server is running...');
-            
-            // Add check to ensure sandbox is ready
-            if (!global.activeSandbox) {
-              console.log('[createSandbox] Sandbox not ready yet, skipping Vite restart');
-              return;
-            }
-            
             const restartResponse = await fetch('/api/restart-vite', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' }
@@ -701,15 +694,8 @@ Tip: I automatically detect and install npm packages from your code imports (lik
           console.log('[applyGeneratedCode] Response data:', data);
           console.log('[applyGeneratedCode] Debug info:', data.debug);
           console.log('[applyGeneratedCode] Current sandboxData:', sandboxData);
-          
-          // Add null checks before logging iframe info
-          if (iframeRef.current) {
-            console.log('[applyGeneratedCode] Current iframe element:', iframeRef.current);
-            console.log('[applyGeneratedCode] Current iframe src:', iframeRef.current.src);
-          } else {
-            console.log('[applyGeneratedCode] Current iframe element: null (not yet created)');
-            console.log('[applyGeneratedCode] Current iframe src: undefined');
-          }
+          console.log('[applyGeneratedCode] Current iframe element:', iframeRef.current);
+          console.log('[applyGeneratedCode] Current iframe src:', iframeRef.current?.src);
 
           if (results.filesCreated?.length > 0) {
             setConversationContext(prev => ({
@@ -759,30 +745,109 @@ Tip: I automatically detect and install npm packages from your code imports (lik
             // but that's only available in the backend API routes
             console.log('[build-test] Skipping build test - would need API endpoint');
 
+            // Force iframe refresh after applying code
+            const refreshDelay = appConfig.codeApplication.defaultRefreshDelay; // Allow Vite to process changes
+
+            setTimeout(() => {
+              if (iframeRef.current && sandboxData?.url) {
+                console.log('[home] Refreshing iframe after code application...');
+
+                // Method 1: Change src with timestamp
+                const urlWithTimestamp = `${sandboxData.url}?t=${Date.now()}&applied=true`;
+                iframeRef.current.src = urlWithTimestamp;
+
+                // Method 2: Force reload after a short delay
+                setTimeout(() => {
+                  try {
+                    if (iframeRef.current?.contentWindow) {
+                      iframeRef.current.contentWindow.location.reload();
+                      console.log('[home] Force reloaded iframe content');
+                    }
+                  } catch (e) {
+                    console.log('[home] Could not reload iframe (cross-origin):', e);
+                  }
+                }, 1000);
+              }
+            }, refreshDelay);
+
             // Vite error checking removed - handled by template setup
           }
 
-          // Single iframe refresh mechanism - remove all others
+          // Give Vite HMR a moment to detect changes, then ensure refresh
           if (iframeRef.current && sandboxData?.url) {
+            // Wait for Vite to process the file changes
+            // If packages were installed, wait longer for Vite to restart
             const packagesInstalled = results?.packagesInstalled?.length > 0 || data.results?.packagesInstalled?.length > 0;
-            const refreshDelay = packagesInstalled ? 3000 : 1500; // Reduced delays
-            
-            console.log(`[applyGeneratedCode] Scheduling iframe refresh in ${refreshDelay}ms (packages installed: ${packagesInstalled})`);
-            
-            setTimeout(() => {
+            const refreshDelay = packagesInstalled ? appConfig.codeApplication.packageInstallRefreshDelay : appConfig.codeApplication.defaultRefreshDelay;
+            console.log(`[applyGeneratedCode] Packages installed: ${packagesInstalled}, refresh delay: ${refreshDelay}ms`);
+
+            setTimeout(async () => {
               if (iframeRef.current && sandboxData?.url) {
-                console.log('[applyGeneratedCode] Refreshing iframe...');
-                
-                // Simple src change with timestamp - let Vite HMR handle the rest
-                const urlWithTimestamp = `${sandboxData.url}?t=${Date.now()}&refresh=true`;
-                iframeRef.current.src = urlWithTimestamp;
-                
-                console.log('[applyGeneratedCode] Iframe refresh initiated');
+                console.log('[applyGeneratedCode] Starting iframe refresh sequence...');
+                console.log('[applyGeneratedCode] Current iframe src:', iframeRef.current.src);
+                console.log('[applyGeneratedCode] Sandbox URL:', sandboxData.url);
+
+                // Method 1: Try direct navigation first
+                try {
+                  const urlWithTimestamp = `${sandboxData.url}?t=${Date.now()}&force=true`;
+                  console.log('[applyGeneratedCode] Attempting direct navigation to:', urlWithTimestamp);
+
+                  // Remove any existing onload handler
+                  iframeRef.current.onload = null;
+
+                  // Navigate directly
+                  iframeRef.current.src = urlWithTimestamp;
+
+                  // Wait a bit and check if it loaded
+                  await new Promise(resolve => setTimeout(resolve, 2000));
+
+                  // Try to access the iframe content to verify it loaded
+                  try {
+                    const iframeDoc = iframeRef.current.contentDocument || iframeRef.current.contentWindow?.document;
+                    if (iframeDoc && iframeDoc.readyState === 'complete') {
+                      console.log('[applyGeneratedCode] Iframe loaded successfully');
+                      return;
+                    }
+                  } catch (e) {
+                    console.log('[applyGeneratedCode] Cannot access iframe content (CORS), assuming loaded');
+                    return;
+                  }
+                } catch (e) {
+                  console.error('[applyGeneratedCode] Direct navigation failed:', e);
+                }
+
+                // Method 2: Force complete iframe recreation if direct navigation failed
+                console.log('[applyGeneratedCode] Falling back to iframe recreation...');
+                const parent = iframeRef.current.parentElement;
+                const newIframe = document.createElement('iframe');
+
+                // Copy attributes
+                newIframe.className = iframeRef.current.className;
+                newIframe.title = iframeRef.current.title;
+                newIframe.allow = iframeRef.current.allow;
+                // Copy sandbox attributes
+                const sandboxValue = iframeRef.current.getAttribute('sandbox');
+                if (sandboxValue) {
+                  newIframe.setAttribute('sandbox', sandboxValue);
+                }
+
+                // Remove old iframe
+                iframeRef.current.remove();
+
+                // Add new iframe
+                newIframe.src = `${sandboxData.url}?t=${Date.now()}&recreated=true`;
+                parent?.appendChild(newIframe);
+
+                // Update ref
+                iframeRef.current = newIframe;
+
+                console.log('[applyGeneratedCode] Iframe recreated with new content');
+              } else {
+                console.error('[applyGeneratedCode] No iframe or sandbox URL available for refresh');
               }
-            }, refreshDelay);
+            }, refreshDelay); // Dynamic delay based on whether packages were installed
           }
 
-          // TO HERE
         } else {
           throw new Error(finalData?.error || 'Failed to apply code');
         }
@@ -2575,34 +2640,14 @@ Focus on the key sections and content, making it clean and modern.`;
                               fileExt === 'json' ? 'json' :
                                 fileExt === 'html' ? 'html' : 'text';
 
-                          const existingFileIndex = updatedState.files.findIndex(f => f.path === filePath);
-
-                          if (existingFileIndex >= 0) {
-                            updatedState.files = [
-                              ...updatedState.files.slice(0, existingFileIndex),
-                              {
-                                ...updatedState.files[existingFileIndex],
-                                content: partialContent.trim(),
-                                type: fileType,
-                                completed: true,
-                                edited: true
-                              },
-                              ...updatedState.files.slice(existingFileIndex + 1)
-                            ];
-                          } else {
-                            updatedState.files = [...updatedState.files, {
-                              path: filePath,
-                              content: partialContent.trim(),
-                              type: fileType,
-                              completed: true,
-                              edited: false
-                            }];
-                          }
-
+                          updatedState.currentFile = {
+                            path: filePath,
+                            content: partialContent,
+                            type: fileType
+                          };
                           if (!prev.isEdit) {
-                            updatedState.status = `Completed ${filePath}`;
+                            updatedState.status = `Generating ${filePath}`;
                           }
-                          processedFiles.add(filePath);
                         }
                       } else {
                         updatedState.currentFile = undefined;
@@ -2890,34 +2935,14 @@ Focus on creating a beautiful, functional website based on the description.`;
                               fileExt === 'json' ? 'json' :
                                 fileExt === 'html' ? 'html' : 'text';
 
-                          const existingFileIndex = updatedState.files.findIndex(f => f.path === filePath);
-
-                          if (existingFileIndex >= 0) {
-                            updatedState.files = [
-                              ...updatedState.files.slice(0, existingFileIndex),
-                              {
-                                ...updatedState.files[existingFileIndex],
-                                content: partialContent.trim(),
-                                type: fileType,
-                                completed: true,
-                                edited: true
-                              },
-                              ...updatedState.files.slice(existingFileIndex + 1)
-                            ];
-                          } else {
-                            updatedState.files = [...updatedState.files, {
-                              path: filePath,
-                              content: partialContent.trim(),
-                              type: fileType,
-                              completed: true,
-                              edited: false
-                            }];
-                          }
-
+                          updatedState.currentFile = {
+                            path: filePath,
+                            content: partialContent,
+                            type: fileType
+                          };
                           if (!prev.isEdit) {
-                            updatedState.status = `Completed ${filePath}`;
+                            updatedState.status = `Generating ${filePath}`;
                           }
-                          processedFiles.add(filePath);
                         }
                       } else {
                         updatedState.currentFile = undefined;
@@ -3218,34 +3243,14 @@ I'll now generate a website based on these requirements and our UI design princi
                             fileExt === 'json' ? 'json' :
                               fileExt === 'html' ? 'html' : 'text';
 
-                        const existingFileIndex = updatedState.files.findIndex(f => f.path === filePath);
-
-                        if (existingFileIndex >= 0) {
-                          updatedState.files = [
-                            ...updatedState.files.slice(0, existingFileIndex),
-                            {
-                              ...updatedState.files[existingFileIndex],
-                              content: partialContent.trim(),
-                              type: fileType,
-                              completed: true,
-                              edited: true
-                            },
-                            ...updatedState.files.slice(existingFileIndex + 1)
-                          ];
-                        } else {
-                          updatedState.files = [...updatedState.files, {
-                            path: filePath,
-                            content: partialContent.trim(),
-                            type: fileType,
-                            completed: true,
-                            edited: false
-                          }];
-                        }
-
+                        updatedState.currentFile = {
+                          path: filePath,
+                          content: partialContent,
+                          type: fileType
+                        };
                         if (!prev.isEdit) {
-                          updatedState.status = `Completed ${filePath}`;
+                          updatedState.status = `Generating ${filePath}`;
                         }
-                        processedFiles.add(filePath);
                       }
                     } else {
                       updatedState.currentFile = undefined;
