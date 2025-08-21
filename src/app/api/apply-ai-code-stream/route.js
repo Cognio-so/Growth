@@ -39,24 +39,50 @@ function parseAIResponse(response) {
     return packages;
   }
 
-  // FIXED: More robust file parsing that handles conversational text and truncated content
   const fileMap = new Map();
 
-  // First, try to find complete file blocks
-  const fileRegex = /<file path="([^"]+)">([\s\S]*?)<\/file>/g;
+  // SIMPLE FIX: Just clean up the response before parsing
+  let cleanResponse = response;
+  
+  // Remove conversational text that appears before file blocks
+  const fileStartIndex = response.indexOf('<file path="');
+  if (fileStartIndex > 0) {
+    cleanResponse = response.substring(fileStartIndex);
+    console.log('[apply-ai-code-stream] Removed conversational text before file blocks');
+  }
+
+  const fileRegex = /<file path="([^"]+)">([\s\S]*?)(?:<\/file>|$)/g;
   let match;
-  while ((match = fileRegex.exec(response)) !== null) {
+  while ((match = fileRegex.exec(cleanResponse)) !== null) {
     const filePath = match[1];
     const content = match[2].trim();
-    
-    // Skip empty or very short content
-    if (content.length < 10) {
-      console.warn(`[apply-ai-code-stream] Skipping file ${filePath} with very short content: ${content.length} chars`);
-      continue;
+    const hasClosingTag = cleanResponse.substring(match.index, match.index + match[0].length).includes('</file>');
+
+    const existing = fileMap.get(filePath);
+
+    let shouldReplace = false;
+    if (!existing) {
+      shouldReplace = true;
+    } else if (!existing.isComplete && hasClosingTag) {
+      shouldReplace = true;
+      console.log(`[apply-ai-code-stream] Replacing incomplete ${filePath} with complete version`);
+    } else if (existing.isComplete && hasClosingTag && content.length > existing.content.length) {
+      shouldReplace = true;
+      console.log(`[apply-ai-code-stream] Replacing ${filePath} with longer complete version`);
+    } else if (!existing.isComplete && !hasClosingTag && content.length > existing.content.length) {
+      shouldReplace = true;
     }
 
-    fileMap.set(filePath, { content, isComplete: true });
-    console.log(`[apply-ai-code-stream] Found complete file: ${filePath} (${content.length} chars)`);
+    if (shouldReplace) {
+      if (content.includes('...') && !content.includes('...props') && !content.includes('...rest')) {
+        console.warn(`[apply-ai-code-stream] Warning: ${filePath} contains ellipsis, may be truncated`);
+        if (!existing) {
+          fileMap.set(filePath, { content, isComplete: hasClosingTag });
+        }
+      } else {
+        fileMap.set(filePath, { content, isComplete: hasClosingTag });
+      }
+    }
   }
 
   // If no complete files found, try to find incomplete file blocks
