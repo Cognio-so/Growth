@@ -194,11 +194,16 @@ function AISandboxPageContent() {
 
   useEffect(() => {
     if (!showHomeScreen && homeUrlInput && homeUrlInput.trim() && !urlScreenshot && !isCapturingScreenshot) {
-      let screenshotUrl = homeUrlInput.trim();
-      if (!screenshotUrl.match(/^https?:\/\//i)) {
-        screenshotUrl = 'https://' + screenshotUrl;
+      // Additional validation to prevent empty URL calls
+      const trimmedInput = homeUrlInput.trim();
+      if (trimmedInput && trimmedInput.length > 0) {
+        let screenshotUrl = trimmedInput;
+        if (!screenshotUrl.match(/^https?:\/\//i)) {
+          screenshotUrl = 'https://' + screenshotUrl;
+        }
+        console.log('[screenshot] Capturing screenshot for:', screenshotUrl);
+        captureUrlScreenshot(screenshotUrl);
       }
-      captureUrlScreenshot(screenshotUrl);
     }
   }, [showHomeScreen, homeUrlInput]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -368,6 +373,7 @@ function AISandboxPageContent() {
       console.log('[createSandbox] Response data:', data);
 
       if (data.success) {
+        // Ensure sandboxData is set immediately
         setSandboxData(data);
         updateStatus('Sandbox active', true);
         log('Sandbox created successfully!');
@@ -419,6 +425,7 @@ function AISandboxPageContent() {
 Tip: I automatically detect and install npm packages from your code imports (like react-router-dom, axios, etc.)`, 'system');
         }
 
+        // Set iframe src immediately when available
         setTimeout(() => {
           if (iframeRef.current) {
             iframeRef.current.src = data.url;
@@ -449,18 +456,15 @@ Tip: I automatically detect and install npm packages from your code imports (lik
     setLoadingStage('applying');
     log('Applying AI-generated code...');
 
-    // Add safety checks at the beginning
+    // Only check for sandboxData, don't require iframe to be ready
     if (!sandboxData?.url) {
       console.error('[applyGeneratedCode] No sandbox URL available');
       addChatMessage('Error: No active sandbox. Please create a sandbox first.', 'system');
       return;
     }
 
-    if (!iframeRef.current) {
-      console.error('[applyGeneratedCode] Iframe ref not available');
-      addChatMessage('Error: Preview not ready. Please wait for sandbox to load.', 'system');
-      return;
-    }
+    // Remove the iframe check - it's too restrictive and breaks redesign functionality
+    // The iframe will be created when the sandbox is ready
 
     try {
       setCodeApplicationState({ stage: 'analyzing' });
@@ -478,7 +482,7 @@ Tip: I automatically detect and install npm packages from your code imports (lik
           response: code,
           isEdit: isEdit,
           packages: pendingPackages,
-          sandboxId: sandboxData?.sandboxId // Pass the sandbox ID to ensure proper connection
+          sandboxId: sandboxData?.sandboxId
         })
       });
 
@@ -771,7 +775,7 @@ Tip: I automatically detect and install npm packages from your code imports (lik
           }
 
           // Give Vite HMR a moment to detect changes, then ensure refresh
-          if (iframeRef.current && sandboxData?.url) {
+          if (sandboxData?.url) {
             // Wait for Vite to process the file changes
             // If packages were installed, wait longer for Vite to restart
             const packagesInstalled = results?.packagesInstalled?.length > 0 || data.results?.packagesInstalled?.length > 0;
@@ -779,6 +783,7 @@ Tip: I automatically detect and install npm packages from your code imports (lik
             console.log(`[applyGeneratedCode] Packages installed: ${packagesInstalled}, refresh delay: ${refreshDelay}ms`);
 
             setTimeout(async () => {
+              // Check if iframe exists, if not, wait for it to be created
               if (iframeRef.current && sandboxData?.url) {
                 console.log('[applyGeneratedCode] Starting iframe refresh sequence...');
                 console.log('[applyGeneratedCode] Current iframe src:', iframeRef.current.src);
