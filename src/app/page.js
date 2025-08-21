@@ -130,7 +130,6 @@ function AISandboxPageContent() {
     let isMounted = true;
 
     const initializePage = async () => {
-
       try {
         await fetch('/api/conversation-state', {
           method: 'POST',
@@ -147,15 +146,14 @@ function AISandboxPageContent() {
 
       if (!isMounted) return;
 
-
       const sandboxIdParam = searchParams.get('sandbox');
 
       setLoading(true);
       try {
         if (sandboxIdParam) {
           console.log('[home] Attempting to restore sandbox:', sandboxIdParam);
-
-          await createSandbox(true);
+          // Only restore existing sandbox, don't create new one
+          await checkSandboxStatus();
         } else {
           console.log('[home] No sandbox in URL, creating new sandbox automatically...');
           await createSandbox(true);
@@ -180,7 +178,6 @@ function AISandboxPageContent() {
   }, []); // Run only on mount
 
   useEffect(() => {
-
     const handleKeyDown = (e) => {
       if (e.key === 'Escape' && showHomeScreen) {
         setHomeScreenFading(true);
@@ -195,9 +192,8 @@ function AISandboxPageContent() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showHomeScreen]);
 
-
   useEffect(() => {
-    if (!showHomeScreen && homeUrlInput && !urlScreenshot && !isCapturingScreenshot) {
+    if (!showHomeScreen && homeUrlInput && homeUrlInput.trim() && !urlScreenshot && !isCapturingScreenshot) {
       let screenshotUrl = homeUrlInput.trim();
       if (!screenshotUrl.match(/^https?:\/\//i)) {
         screenshotUrl = 'https://' + screenshotUrl;
@@ -206,11 +202,8 @@ function AISandboxPageContent() {
     }
   }, [showHomeScreen, homeUrlInput]); // eslint-disable-line react-hooks/exhaustive-deps
 
-
   useEffect(() => {
-
     checkSandboxStatus();
-
 
     const handleFocus = () => {
       checkSandboxStatus();
@@ -226,7 +219,6 @@ function AISandboxPageContent() {
     }
   }, [chatMessages]);
 
-
   const updateStatus = (text, active) => {
     setStatus({ text, active });
   };
@@ -237,7 +229,6 @@ function AISandboxPageContent() {
 
   const addChatMessage = (content, type, metadata) => {
     setChatMessages(prev => {
-
       if (type === 'system' && prev.length > 0) { 
         const lastMessage = prev[prev.length - 1];
         if (lastMessage.type === 'system' && lastMessage.content === content) {
@@ -254,14 +245,10 @@ function AISandboxPageContent() {
       return;
     }
 
-
     addChatMessage('Sandbox is ready. Vite configuration is handled by the template.', 'system');
   };
 
   const handleSurfaceError = (errors) => {
-
-
-
     const textarea = document.querySelector('textarea');
     if (textarea) {
       textarea.focus();
@@ -302,7 +289,6 @@ function AISandboxPageContent() {
 
               switch (data.type) {
                 case 'command':
-
                   if (!data.command.includes('npm install')) {
                     addChatMessage(data.command, 'command', { commandType: 'input' });
                   }
@@ -358,6 +344,12 @@ function AISandboxPageContent() {
   };
 
   const createSandbox = async (fromHomeScreen = false) => {
+    // Prevent multiple simultaneous sandbox creation
+    if (loading) {
+      console.log('[createSandbox] Already creating sandbox, skipping...');
+      return;
+    }
+
     console.log('[createSandbox] Starting sandbox creation...');
     setLoading(true);
     setShowLoadingBackground(true);
@@ -397,6 +389,7 @@ function AISandboxPageContent() {
 
         setTimeout(fetchSandboxFiles, 1000);
 
+        // Only restart Vite if we have an active sandbox
         setTimeout(async () => {
           try {
             console.log('[createSandbox] Ensuring Vite server is running...');
@@ -409,7 +402,11 @@ function AISandboxPageContent() {
               const restartData = await restartResponse.json();
               if (restartData.success) {
                 console.log('[createSandbox] Vite server started successfully');
+              } else {
+                console.warn('[createSandbox] Vite restart failed:', restartData.error);
               }
+            } else {
+              console.warn('[createSandbox] Vite restart request failed:', restartResponse.status);
             }
           } catch (error) {
             console.error('[createSandbox] Error starting Vite server:', error);
@@ -535,7 +532,6 @@ Tip: I automatically detect and install npm packages from your code imports (lik
                   break;
 
                 case 'command':
-
                   if (data.command && !data.command.includes('npm install')) {
                     addChatMessage(data.command, 'command', { commandType: 'input' });
                   }
@@ -551,11 +547,9 @@ Tip: I automatically detect and install npm packages from your code imports (lik
                   break;
 
                 case 'file-progress':
-
                   break;
 
                 case 'file-complete':
-
                   break;
 
                 case 'command-progress':
@@ -594,19 +588,16 @@ Tip: I automatically detect and install npm packages from your code imports (lik
                   break;
 
                 case 'info':
-
                   if (data.message) {
                     addChatMessage(data.message, 'system');
                   }
                   break;
               }
             } catch (e) {
-
             }
           }
         }
       }
-
 
       if (finalData && finalData.type === 'complete') {
         const data = {
@@ -620,7 +611,6 @@ Tip: I automatically detect and install npm packages from your code imports (lik
         if (data.success) {
           const { results } = data;
 
-
           if (results.packagesInstalled?.length > 0) {
             log(`Packages installed: ${results.packagesInstalled.join(', ')}`);
           }
@@ -631,11 +621,8 @@ Tip: I automatically detect and install npm packages from your code imports (lik
               log(`  ${file}`, 'command');
             });
 
-
             if (sandboxData?.sandboxId && results.filesCreated.length > 0) {
-
               setTimeout(() => {
-
                 if (iframeRef.current) {
                   iframeRef.current.src = iframeRef.current.src;
                 }
@@ -649,7 +636,6 @@ Tip: I automatically detect and install npm packages from your code imports (lik
               log(`  ${file}`, 'command');
             });
           }
-
 
           setConversationContext(prev => ({
             ...prev,
@@ -718,8 +704,6 @@ Tip: I automatically detect and install npm packages from your code imports (lik
                 timestamp: new Date()
               }]
             }));
-
-
 
             if (isEdit) {
               addChatMessage(`Edit applied successfully!`, 'system');
@@ -867,7 +851,6 @@ Tip: I automatically detect and install npm packages from your code imports (lik
           throw new Error(finalData?.error || 'Failed to apply code');
         }
       } else {
-
         addChatMessage('Code application may have partially succeeded. Check the preview.', 'system');
       }
     } catch (error) {
@@ -1826,7 +1809,6 @@ Please create a complete React application following the UI/UX design principles
     }
   };
 
-
   const downloadZip = async () => {
     if (!sandboxData) {
       addChatMessage('No active sandbox to download. Create a sandbox first!', 'system');
@@ -1891,7 +1873,6 @@ Please create a complete React application following the UI/UX design principles
     await applyGeneratedCode(conversationContext.lastGeneratedCode, isEdit);
   };
 
-
   useEffect(() => {
     if (codeDisplayRef.current && generationProgress.isStreaming) {
       codeDisplayRef.current.scrollTop = codeDisplayRef.current.scrollHeight;
@@ -1935,7 +1916,6 @@ Please create a complete React application following the UI/UX design principles
       timestamp: new Date()
     }]);
   };
-
 
   const cloneWebsite = async () => {
     let url = urlInput.trim();
@@ -2373,6 +2353,12 @@ Focus on the key sections and content, making it clean and modern while preservi
   };
 
   const captureUrlScreenshot = async (url) => {
+    if (!url || !url.trim()) {
+      console.error('[captureUrlScreenshot] No URL provided');
+      setScreenshotError('No URL provided for screenshot');
+      return;
+    }
+
     setLoadingStage('scraping');
     setIsCapturingScreenshot(true);
     setScreenshotError(null);
