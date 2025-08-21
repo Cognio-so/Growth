@@ -7,7 +7,7 @@ import { selectFilesForEdit, getFileContents, formatFilesForAI } from '../../../
 import { executeSearchPlan, formatSearchResultsForAI, selectTargetFile } from '../../../lib/file-search-executor';
 import { getUIPrinciplesPrompt } from '../../../lib/ui-principles';
 import appConfig from '../../../../config/app.config';
-import { getRandomDesignSchema, getDifferentRandomDesignSchema, getDesignSchemaByUrl, extractDesignPatterns, schemaToUIPrinciples, getSchemaCount, testSchemaParsing, getSchemaUsageStats } from '../../../lib/design-schema-utils';
+import { getRandomDesignSchema, getDifferentRandomDesignSchema, getRedesignSchema, getRegenerateDesignSchema, getDesignSchemaByUrl, extractDesignPatterns, schemaToUIPrinciples, getSchemaCount, testSchemaParsing, getSchemaUsageStats } from '../../../lib/design-schema-utils';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 const groq = createGroq({
@@ -69,24 +69,27 @@ export async function POST(request) {
     console.log('[generate-ai-code-stream] - context.currentFiles:', context?.currentFiles ? Object.keys(context.currentFiles) : 'none');
     console.log('[generate-ai-code-stream] - currentFiles count:', context?.currentFiles ? Object.keys(context.currentFiles).length : 0);
 
-    // Check if this is a redesign request
-    const isRedesign = prompt.toLowerCase().includes('redesign') && isEdit;
+    // Check if this is a redesign request - FIXED: Remove isEdit requirement
+    const isRedesign = prompt.toLowerCase().includes('redesign') || prompt.toLowerCase().includes('rebuild') || prompt.toLowerCase().includes('replace');
+    // Check if this is a regenerate request
+    const isRegenerate = prompt.toLowerCase().includes('regenerate') || prompt.toLowerCase().includes('generate again') || prompt.toLowerCase().includes('create again');
     console.log('[generate-ai-code-stream] - isRedesign:', isRedesign);
+    console.log('[generate-ai-code-stream] - isRegenerate:', isRegenerate);
 
     // UPDATED LOGIC: Intelligently select the best design schema based on user query
     let targetUrl = null;
     let designSchema = null;
-    let csvData = null;
+    let schemaData = null;
     let shouldScrape = false;
 
-    // STEP 1: Intelligently select the best design schema from CSV based on user query
-    console.log('[generate-ai-code-stream] 🔍 Intelligently selecting best design schema from CSV...');
+    // STEP 1: Intelligently select the best design schema from SCHEMA.md based on user query
+    console.log('[generate-ai-code-stream] 🔍 Intelligently selecting best design schema from SCHEMA.md...');
     
-    // Test CSV parsing first
-    const csvTest = testSchemaParsing();
-    console.log('[generate-ai-code-stream] CSV Test Result:', csvTest);
+    // Test schema parsing first
+    const schemaTest = testSchemaParsing();
+    console.log('[generate-ai-code-stream] Schema Test Result:', schemaTest);
     
-    if (csvTest.success && csvTest.totalSchemas > 0) {
+    if (schemaTest.success && schemaTest.totalSchemas > 0) {
       const userRequest = extractUserRequest(prompt);
       console.log('[generate-ai-code-stream] Extracted user request:', userRequest);
       
@@ -94,54 +97,80 @@ export async function POST(request) {
       const usageStats = getSchemaUsageStats();
       console.log('[generate-ai-code-stream] Schema usage stats:', usageStats);
       
-      // Use different schema selection for redesigns
-      if (isRedesign) {
-        console.log('[generate-ai-code-stream] 🎨 REDESIGN MODE: Selecting different schema to avoid repetition');
+      // SCENARIO 1: User provided URL - choose schema and scrape content
+      if (userProvidedUrl && userProvidedUrl.startsWith('http')) {
+        console.log('[generate-ai-code-stream] 🎯 SCENARIO 1: User provided URL - choosing schema and scraping content');
         
-        // Get the last used schema ID to exclude it
-        const excludeIds = usageStats.lastUsedId ? [usageStats.lastUsedId] : [];
-        
-        // Try to get a different relevant schema first
-        designSchema = getDifferentRandomDesignSchema(userRequest, excludeIds);
-        
-        if (!designSchema) {
-          // Fallback to different random schema
-          designSchema = getDifferentRandomDesignSchema();
-        }
-      } else {
-        // Use intelligent schema selection for new generations
+        // Choose a random schema for design patterns
         designSchema = getRandomDesignSchema();
+        
+        if (designSchema && designSchema.schema) {
+          schemaData = designSchema.schema;
+          targetUrl = userProvidedUrl;
+          shouldScrape = true;
+          
+          console.log('[generate-ai-code-stream] ✅ SCHEMA SELECTED FOR URL SCENARIO:');
+          console.log('[generate-ai-code-stream] - Schema URL:', designSchema.url);
+          console.log('[generate-ai-code-stream] - Schema ID:', designSchema.id);
+          console.log('[generate-ai-code-stream] - Target URL to scrape:', targetUrl);
+          console.log('[generate-ai-code-stream] - Will scrape content and use schema design patterns');
+        }
+      }
+      // SCENARIO 2: Regenerate request - choose different schema and create new design
+      else if (isRegenerate) {
+        console.log('[generate-ai-code-stream] 🔄 SCENARIO 2: Regenerate request - choosing different schema for new design');
+        
+        // Get a completely new schema (excluding all previously used)
+        designSchema = getRegenerateDesignSchema();
+        
+        if (designSchema && designSchema.schema) {
+          schemaData = designSchema.schema;
+          
+          console.log('[generate-ai-code-stream] ✅ NEW SCHEMA SELECTED FOR REGENERATE:');
+          console.log('[generate-ai-code-stream] - Schema URL:', designSchema.url);
+          console.log('[generate-ai-code-stream] - Schema ID:', designSchema.id);
+          console.log('[generate-ai-code-stream] - Total schemas available:', getSchemaCount());
+          console.log('[generate-ai-code-stream] - Schemas used so far:', usageStats.used);
+          console.log('[generate-ai-code-stream] - Will create new design using schema patterns only');
+        }
+      }
+      // SCENARIO 3: Normal request (no URL, no regenerate) - choose random schema
+      else {
+        console.log('[generate-ai-code-stream] SCENARIO 3: Normal request - choosing random schema for design');
+        
+        // Use different schema selection for redesigns
+        if (isRedesign) {
+          console.log('[generate-ai-code-stream] 🎨 REDESIGN MODE: Selecting different schema to avoid repetition');
+          designSchema = getRedesignSchema();
+        } else {
+          // Use intelligent schema selection for new generations
+          designSchema = getRandomDesignSchema();
+        }
+        
+        if (designSchema && designSchema.schema) {
+          schemaData = designSchema.schema;
+          
+          console.log('[generate-ai-code-stream] ✅ SCHEMA SELECTED FOR NORMAL REQUEST:');
+          console.log('[generate-ai-code-stream] - Schema URL:', designSchema.url);
+          console.log('[generate-ai-code-stream] - Schema ID:', designSchema.id);
+          console.log('[generate-ai-code-stream] - Total schemas available:', getSchemaCount());
+          console.log('[generate-ai-code-stream] - Schemas used so far:', usageStats.used);
+          console.log('[generate-ai-code-stream] - Will create design using schema patterns only');
+        }
       }
       
       if (designSchema && designSchema.schema) {
-        csvData = designSchema.schema;
-        
-        console.log('[generate-ai-code-stream] ✅ SCHEMA SELECTED:');
-        console.log('[generate-ai-code-stream] - URL:', designSchema.url);
-        console.log('[generate-ai-code-stream] - Schema ID:', designSchema.id);
-        console.log('[generate-ai-code-stream] - Selection Method:', designSchema.queryAnalysis?.method || 'unknown');
-        console.log('[generate-ai-code-stream] - Total schemas available:', getSchemaCount());
-        console.log('[generate-ai-code-stream] - Schemas used so far:', usageStats.usedSchemas);
-        console.log('[generate-ai-code-stream] - Using CSV data for design schema');
-        
         // Extract design patterns for better implementation guidance
         const designPatterns = extractDesignPatterns(designSchema);
-        console.log('[generate-ai-code-stream] Extracted design patterns:', Object.keys(designPatterns));
+        console.log('[generate-ai-code-stream] Extracted design patterns:', Object.keys(designPatterns || {}));
       } else {
         console.warn('[generate-ai-code-stream] No schema found from selection');
       }
     } else {
-      console.warn('[generate-ai-code-stream] CSV parsing failed, proceeding without design schema');
+      console.warn('[generate-ai-code-stream] Schema parsing failed, proceeding without design schema');
     }
 
-    // STEP 2: If user provided URL, ALSO scrape it for content
-    if (userProvidedUrl && userProvidedUrl.startsWith('http')) {
-      targetUrl = userProvidedUrl;
-      shouldScrape = true;
-      console.log('[generate-ai-code-stream] User provided URL, will also scrape for content:', targetUrl);
-    }
-
-    // Scrape the target URL ONLY if user provided a URL
+    // STEP 2: Scrape the target URL if user provided one
     let scrapedContent = null;
     let screenshot = null;
     let businessInfo = null;
@@ -199,7 +228,11 @@ export async function POST(request) {
         // Continue without scraped content - we'll still use the design schema
       }
     } else {
-      console.log('[generate-ai-code-stream] No URL provided or no scraping needed - using CSV design schema only');
+      if (userProvidedUrl) {
+        console.log('[generate-ai-code-stream] User provided URL but scraping not needed - using schema design patterns only');
+      } else {
+        console.log('[generate-ai-code-stream] No URL provided - using SCHEMA.md design schema only');
+      }
     }
 
     if (!global.conversationState) {
@@ -229,7 +262,8 @@ export async function POST(request) {
           url: designSchema.url,
           scrapedContent: scrapedContent ? true : false,
           screenshot: screenshot ? true : false,
-          csvData: csvData ? true : false
+          schemaData: schemaData ? true : false,
+          scenario: userProvidedUrl ? 'URL_PROVIDED' : isRegenerate ? 'REGENERATE' : 'NORMAL_REQUEST'
         } : null,
         businessInfo: businessInfo
       }
@@ -304,7 +338,7 @@ export async function POST(request) {
 
                 await sendProgress({
                   type: 'status',
-                  message: `🔍 Searching for: "${searchPlan.searchTerms.join('", "')}"`
+                  message: `�� Searching for: "${searchPlan.searchTerms.join('", "')}"`
                 });
 
                 const searchExecution = executeSearchPlan(searchPlan,
@@ -463,91 +497,19 @@ User request: "${prompt}"`;
                         const allFiles = Object.keys(manifest.files)
                           .filter(path => !targetFiles.includes(path));
 
+                        // Use context selector with design schema
+                        const contextResult = selectFilesForEdit(
+                          prompt,
+                          manifest,
+                          businessInfo,
+                          null, // documentDesignPrompt
+                          designSchema // Pass the design schema
+                        );
+
                         editContext = {
-                          primaryFiles: targetFiles,
-                          contextFiles: allFiles,
-                          systemPrompt: `
-You are an expert senior software engineer performing a surgical, context-aware code modification. Your primary directive is **precision and preservation**.
-
-Think of yourself as a surgeon making a precise incision, not a construction worker demolishing a wall.
-
-## Search-Based Edit
-Search Terms: ${searchPlan?.searchTerms?.join(', ') || 'keyword-based'}
-Edit Type: ${searchPlan?.editType || 'UPDATE_COMPONENT'}
-Reasoning: ${searchPlan?.reasoning || 'Modifying based on user request'}
-
-Files to Edit: ${targetFiles.join(', ') || 'To be determined'}
-User Request: "${prompt}"
-
-## Your Mandatory Thought Process (Execute Internally):
-Before writing ANY code, you MUST follow these steps:
-
-1. **Understand Intent:**
-   - What is the user's core goal? (adding feature, fixing bug, changing style?)
-   - Does the conversation history provide extra clues?
-
-2. **Locate the Code:**
-   - First examine the Primary Files provided
-   - Check the "ALL PROJECT FILES" list to find the EXACT file name
-   - "nav" might be Navigation.tsx, NavBar.tsx, Nav.tsx, or Header.tsx
-   - DO NOT create a new file if a similar one exists!
-
-3. **Plan the Changes (Mental Diff):**
-   - What is the *minimal* set of changes required?
-   - Which exact lines need to be added, modified, or deleted?
-   - Will this require new packages?
-
-4. **Verify Preservation:**
-   - What existing code, props, state, and logic must NOT be touched?
-   - How can I make my change without disrupting surrounding code?
-
-5. **Construct the Final Code:**
-   - Only after completing steps above, generate the final code
-   - Provide the ENTIRE file content with modifications integrated
-
-## Critical Rules & Constraints:
-
-**PRESERVATION IS KEY:** You MUST NOT rewrite entire components or files. Integrate your changes into the existing code. Preserve all existing logic, props, state, and comments not directly related to the user's request.
-
-**MINIMALISM:** Only output files you have actually changed. If a file doesn't need modification, don't include it.
-
-**COMPLETENESS:** Each file must be COMPLETE from first line to last:
-- NEVER TRUNCATE - Include EVERY line
-- NO ellipsis (...) to skip content
-- ALL imports, functions, JSX, and closing tags must be present
-- The file MUST be runnable
-
-**SURGICAL PRECISION:**
-- Change ONLY what's explicitly requested
-- If user says "change background to green", change ONLY the background class
-- 99% of the original code should remain untouched
-- NO refactoring, reformatting, or "improvements" unless requested
-
-**NO CONVERSATION:** Your output must contain ONLY the code. No explanations or apologies.
-
-## EXAMPLES:
-
-### CORRECT APPROACH for "change hero background to blue":
-<thinking>
-I need to change the background color of the Hero component. Looking at the file, I see the main div has 'bg-gray-900'. I will change ONLY this to 'bg-blue-500' and leave everything else exactly as is.
-</thinking>
-
-Then return the EXACT same file with only 'bg-gray-900' changed to 'bg-blue-500'.
-
-### WRONG APPROACH (DO NOT DO THIS):
-- Rewriting the Hero component from scratch
-- Changing the structure or reorganizing imports
-- Adding or removing unrelated code
-- Reformatting or "cleaning up" the code
-
-Remember: You are a SURGEON making a precise incision, not an artist repainting the canvas!`,
-                          editIntent: {
-                            type: searchPlan?.editType || 'UPDATE_COMPONENT',
-                            targetFiles: targetFiles,
-                            confidence: searchPlan ? 0.85 : 0.6,
-                            description: searchPlan?.reasoning || 'Keyword-based file selection',
-                            suggestedContext: []
-                          }
+                          ...editContext,
+                          ...contextResult,
+                          designSchema: designSchema // Ensure design schema is available
                         };
 
                         enhancedSystemPrompt = editContext.systemPrompt;
@@ -668,39 +630,40 @@ ${context.documentDesignPrompt}
 **CRITICAL:** The website you create MUST reflect the business's unique value proposition and brand identity as specified above. Use the extracted color palette and font preferences when possible, while following the UI design principles below.`;
         }
 
-        // UPDATED SYSTEM PROMPT: Always prioritize CSV schema, then scraped content
-        let csvContext = '';
-        if (csvData) {
+        // UPDATED SYSTEM PROMPT: Always prioritize schema data, then scraped content
+        let schemaContext = '';
+        if (schemaData) {
           const designPatterns = extractDesignPatterns(designSchema);
           
-          csvContext = `
+          schemaContext = `
 
-## 🎯 PRIMARY DESIGN GUIDE: CSV SCHEMA DATA
+## 🎯 PRIMARY DESIGN GUIDE: SCHEMA DATA
 
-**CRITICAL: This CSV schema is your PRIMARY design blueprint. Follow it exactly for UI/UX design.**
+**CRITICAL: This schema is your PRIMARY design blueprint. Follow it exactly for UI/UX design.**
 
-### 🎨 Design Source: ${designSchema?.url || 'Random CSV Schema'}
+### 🎨 Design Source: ${designSchema?.url || 'Random Schema'}
 ### 📊 Schema ID: ${designSchema?.id || 'N/A'}
 ### 📈 Total Schemas Available: ${getSchemaCount()}
+### 🎯 Scenario: ${userProvidedUrl ? 'URL_PROVIDED - Using schema design + scraped content' : isRegenerate ? 'REGENERATE - New schema design only' : 'NORMAL_REQUEST - Schema design only'}
 
 **IMPLEMENTATION PRIORITY:**
-1. CSV Design Schema (PRIMARY - USE THIS FIRST)
-2. Scraped Content (SECONDARY - for content only)
+1. Schema Design Data (PRIMARY - USE THIS FIRST)
+2. Scraped Content (SECONDARY - for content only, if URL provided)
 3. UI Principles (FALLBACK - general guidelines)
 
-${JSON.stringify(csvData, null, 2)}
+${JSON.stringify(schemaData, null, 2)}
 
 ### 🧩 COMPONENT-BY-COMPONENT IMPLEMENTATION GUIDE:
 
 ${(() => {
-  if (!csvData) return '';
+  if (!schemaData) return '';
   
   let instructions = '';
   
   // Extract component specifications
-  if (csvData.components) {
+  if (schemaData.components) {
     instructions += `\n### COMPONENT SPECIFICATIONS:\n`;
-    for (const [componentName, component] of Object.entries(csvData.components)) {
+    for (const [componentName, component] of Object.entries(schemaData.components)) {
       instructions += `\n**${componentName} Component:**\n`;
       instructions += `- **Type:** ${component.type}\n`;
       instructions += `- **Description:** ${component.description}\n`;
@@ -734,61 +697,76 @@ ${(() => {
   }
   
   // Extract page structure
-  if (csvData.page_structure) {
+  if (schemaData.page_structure) {
     instructions += `\n### 📄 PAGE STRUCTURE (IMPLEMENT IN THIS EXACT ORDER):\n`;
-    csvData.page_structure.forEach((item, index) => {
+    schemaData.page_structure.forEach((item, index) => {
       instructions += `${index + 1}. **${item.component}** - ${item.description || 'Component to be implemented'}\n`;
     });
   }
   
   // Extract design system
-  if (csvData.design_system) {
+  if (schemaData.design_system) {
     instructions += `\n### 🎨 DESIGN SYSTEM:\n`;
-    instructions += JSON.stringify(csvData.design_system, null, 2);
+    instructions += JSON.stringify(schemaData.design_system, null, 2);
   }
   
   // Extract layout guidelines
-  if (csvData.layout_guidelines) {
+  if (schemaData.layout_guidelines) {
     instructions += `\n### 📐 LAYOUT GUIDELINES:\n`;
-    instructions += JSON.stringify(csvData.layout_guidelines, null, 2);
+    instructions += JSON.stringify(schemaData.layout_guidelines, null, 2);
   }
   
   return instructions;
 })()}
 
-### CRITICAL IMPLEMENTATION RULES:
+###  DESIGN PATTERNS EXTRACTED:
+${(() => {
+  if (!designPatterns) return 'No design patterns found';
+  
+  let patterns = '';
+  if (designPatterns.colorPalette) {
+    patterns += `\n**Color Palette:**\n`;
+    for (const [component, colors] of Object.entries(designPatterns.colorPalette)) {
+      patterns += `- ${component}: ${JSON.stringify(colors)}\n`;
+    }
+  }
+  
+  if (designPatterns.typography) {
+    patterns += `\n**Typography:**\n`;
+    for (const [component, typography] of Object.entries(designPatterns.typography)) {
+      patterns += `- ${component}: ${JSON.stringify(typography)}\n`;
+    }
+  }
+  
+  return patterns;
+})()}
 
-1. **COMPONENT CREATION:** Create each component exactly as specified in the CSV schema
-2. **COLOR IMPLEMENTATION:** Use the exact color schemes specified for each component
-3. **TYPOGRAPHY:** Apply the typography specifications precisely as defined
-4. **SPACING:** Follow the padding and margin specifications exactly
-5. **PAGE STRUCTURE:** Implement components in the exact order specified in page_structure
-6. **VISUAL HIERARCHY:** Maintain the visual hierarchy as described in the schema
-7. **RESPONSIVE DESIGN:** Ensure all components work across all screen sizes
-8. **ACCESSIBILITY:** Maintain accessibility standards while following the design
-9. **DESIGN PATTERNS:** Follow the extracted design patterns consistently across all components
-10. **DESIGN SYSTEM:** Apply any design system rules and guidelines
+**CRITICAL INSTRUCTIONS:**
+1. **ALWAYS** implement the components exactly as specified in the schema
+2. **FOLLOW** the color schemes, typography, and spacing guidelines precisely
+3. **USE** the page structure order for component implementation
+4. **APPLY** the design patterns consistently across all components
+5. **PRIORITIZE** the schema over any other design guidance`;
 
-**MANDATORY:** Every component you create MUST follow the CSV schema specifications exactly. This is your primary design guide.`;
         }
 
-        // Add scraped content context if available (SECONDARY to CSV schema)
+        // Add scraped content context if available (SECONDARY to schema data)
         let scrapedContext = '';
         if (scrapedContent) {
           scrapedContext = `
 
 ## 📄 REAL WEBSITE CONTENT FROM ${targetUrl}:
 
-**IMPORTANT:** Use this content COMBINED with the CSV design schema above:
+**IMPORTANT:** Use this content COMBINED with the schema data above:
 
 ${scrapedContent}
 
 **INSTRUCTIONS:**
-- Use the DESIGN STRUCTURE from the CSV schema above (PRIMARY)
+- Use the DESIGN STRUCTURE from the schema data above (PRIMARY)
 - Use the CONTENT/TEXT from this scraped website (SECONDARY)
-- Combine both to create an authentic website with proper design following CSV schema
+- Combine both to create an authentic website with proper design following schema data
 
-**Note:** The CSV schema defines HOW it should look, this content defines WHAT it should say.`;
+**Note:** The schema data defines HOW it should look, this content defines WHAT it should say.`;
         }
 
         // Add business info context if available
@@ -816,15 +794,15 @@ ${scrapedContent}
 - Component-based architecture
 - Create complete, functional components
 
-${csvData ? `🎯 **PRIMARY DESIGN SOURCE: ${isRedesign ? 'DIFFERENT ' : ''}INTELLIGENTLY SELECTED CSV SCHEMA**
+${schemaData ? `🎯 **PRIMARY DESIGN SOURCE: ${isRegenerate ? 'NEW ' : isRedesign ? 'DIFFERENT ' : ''}INTELLIGENTLY SELECTED SCHEMA**
 
 **CRITICAL INSTRUCTIONS:**
-1. **USE ${isRedesign ? 'DIFFERENT ' : ''}INTELLIGENTLY SELECTED CSV SCHEMA** - This schema was chosen based on your specific request${isRedesign ? ' and is different from the previous one' : ''}
+1. **USE ${isRegenerate ? 'NEW ' : isRedesign ? 'DIFFERENT ' : ''}INTELLIGENTLY SELECTED SCHEMA** - This schema was chosen based on your specific request${isRegenerate ? ' and is completely new' : isRedesign ? ' and is different from the previous one' : ''}
 2. **IMPLEMENT EXACT COMPONENT SPECIFICATIONS** - Follow the component definitions precisely
 3. **FOLLOW PAGE STRUCTURE ORDER** - Implement components in the exact order specified
 4. **APPLY EXACT COLORS AND TYPOGRAPHY** - Use the specified color schemes and typography
 5. **MAINTAIN VISUAL HIERARCHY** - Follow the visual hierarchy as described in the schema
-${isRedesign ? '6. **REDESIGN MODE** - This is a redesign request. Apply the different CSV schema design to the existing content structure' : ''}
+${isRegenerate ? '6. **REGENERATE MODE** - This is a regenerate request. Create a completely new design using the new schema' : isRedesign ? '6. **REDESIGN MODE** - This is a redesign request. Apply the different schema design to the existing content structure' : ''}
 
 **SELECTED SCHEMA ANALYSIS:**
 - **Source URL:** ${designSchema?.url || 'Unknown'}
@@ -835,43 +813,52 @@ ${isRedesign ? '6. **REDESIGN MODE** - This is a redesign request. Apply the dif
 ${isRedesign ? `- **Previous Schema Excluded:** ${designSchema?.queryAnalysis?.excludedIds?.join(', ') || 'none'}` : ''}
 
 **IMPLEMENTATION PRIORITY:**
-1. ${isRedesign ? 'Different ' : ''}Intelligently Selected CSV Schema (PRIMARY - chosen based on your request${isRedesign ? ' and different from previous' : ''})
-2. Scraped Content (SECONDARY - provides real content/text)
+1. ${isRegenerate ? 'New ' : isRedesign ? 'Different ' : ''}Intelligently Selected Schema (PRIMARY - chosen based on your request${isRegenerate ? ' and completely new' : isRedesign ? ' and different from previous' : ''})
+2. Scraped Content (SECONDARY - provides real content/text, if URL provided)
 3. UI/UX Principles (GENERAL GUIDELINES)` : ''}
 
-${isRedesign ? `## 🎨 REDESIGN MODE - USING DIFFERENT INTELLIGENTLY SELECTED CSV SCHEMA
+${isRegenerate ? `## 🔄 REGENERATE MODE - USING NEW INTELLIGENTLY SELECTED SCHEMA
 
-**CRITICAL REDESIGN INSTRUCTIONS:**
-- You are redesigning an existing website using a DIFFERENT intelligently selected design schema from the CSV file
-- This schema was chosen because it best matches your redesign request AND is different from the previous schema used
-- Apply the design patterns, colors, and typography from the selected schema
-- Maintain the existing content and functionality
-- Create a completely new visual design while keeping the same content structure
-- Follow the CSV schema specifications exactly for the new design
-- Make it responsive and modern
-- Preserve all existing functionality and content
-- GENERATE COMPLETE FILES with the new design applied
+**🚨 CRITICAL REGENERATION INSTRUCTIONS - OVERRIDE ALL OTHER RULES:**
+- You are creating a COMPLETELY NEW website with COMPLETELY NEW structure and layout
+- This is NOT just a theme change - this is a complete regeneration from scratch
+- The new schema provides a completely different design system and layout approach
+- IGNORE all existing files and create everything fresh
+- Create NEW component architecture, NEW layout patterns, NEW user flow
+- Generate NEW content that matches the new schema theme
+- Build NEW responsive design patterns and interactions
 
-**Different Intelligently Selected Schema:** ${designSchema?.url || 'Unknown'}
+**WHAT TO REGENERATE (NOT JUST THEME):**
+1. **NEW Component Structure** - Different component hierarchy and relationships
+2. **NEW Layout Patterns** - Different page structure and arrangement
+3. **NEW Navigation Flow** - Different navigation structure and user experience
+4. **NEW Content Sections** - Different content organization and flow
+5. **NEW Visual Hierarchy** - Different visual organization and emphasis
+6. **NEW Responsive Design** - Different responsive patterns and breakpoints
+7. **NEW Interactions** - Different animations and user interactions
+8. **NEW Content** - Fresh content that matches the new schema theme
+
+**REGENERATION PROCESS:**
+1. Analyze the NEW schema's design system and layout approach
+2. Create completely new component structure based on schema
+3. Implement new layout patterns and page flow
+4. Generate fresh content matching the schema theme
+5. Build new responsive design patterns
+6. Add new animations and interactions
+7. Ensure no reference to previous design patterns
+
+**New Intelligently Selected Schema:** ${designSchema?.url || 'Unknown'}
 **Schema ID:** ${designSchema?.id || 'N/A'}
-**Selection Reason:** ${designSchema?.queryAnalysis?.matchedKeywords?.join(', ') || 'Best different match for your request'}
-**Previous Schema Excluded:** ${designSchema?.queryAnalysis?.excludedIds?.join(', ') || 'none'}
-
-**WHAT TO DO:**
-1. Look at the current website structure and content
-2. Apply the DIFFERENT intelligently selected CSV schema's design system to each component
-3. Update colors, typography, spacing, and layout according to the schema
-4. Keep all existing content, just redesign the visual appearance
-5. Generate complete, working files with the new design
-
-**MANDATORY:** You MUST generate complete files with the new design applied. Do not just describe the changes - actually create the redesigned code.` : ''}
+**Selection Reason:** ${designSchema?.queryAnalysis?.matchedKeywords?.join(', ') || 'Best new match for your request'}
+**Previous Schemas Excluded:** All previously used schemas excluded
+**Mode:** COMPLETE REGENERATION (not theme change)` : ''}
 
 ${targetUrl ? `TARGET WEBSITE: ${targetUrl}
-${scrapedContent ? 'You are recreating this website using intelligently selected CSV design schema for layout and real content for text.' : 'You are creating a website inspired by this URL.'}` : ''}
+${scrapedContent ? 'You are recreating this website using intelligently selected schema design for layout and real content for text.' : 'You are creating a website inspired by this URL.'}` : ''}
 
 ${conversationContext}
 
-${csvContext}
+${schemaContext}
 
 ${scrapedContext}
 
@@ -883,15 +870,71 @@ ${getUIPrinciplesPrompt()}
 
 **CRITICAL RULES - YOUR MOST IMPORTANT INSTRUCTIONS:**
 
-${csvData ? `**${isRedesign ? 'DIFFERENT ' : ''}INTELLIGENTLY SELECTED CSV SCHEMA PRIORITY:**
-1. **FOLLOW ${isRedesign ? 'DIFFERENT ' : ''}INTELLIGENTLY SELECTED SCHEMA EXACTLY** - This schema was chosen based on your specific request${isRedesign ? ' and is different from the previous one' : ''}
-2. **IMPLEMENT COMPONENTS IN ORDER** - Follow the page_structure sequence precisely
-3. **USE SPECIFIED COLORS AND TYPOGRAPHY** - Apply the exact color schemes and typography from the schema
-4. **MAINTAIN COMPONENT SPECIFICATIONS** - Follow the component definitions exactly as written
-5. **COMBINE WITH UI PRINCIPLES** - Use general UI principles to enhance the CSV specifications
-${isRedesign ? '6. **REDESIGN MODE** - Apply the different intelligently selected schema design to existing content structure' : ''}
-6. **USE SCRAPED CONTENT FOR TEXT** - If available, use real content from scraped website with CSV design` : ''}
+${isRedesign ? `
+ **REDESIGN MODE - OVERRIDE ALL OTHER RULES**
+**YOU ARE CREATING A COMPLETELY NEW WEBSITE FROM SCRATCH**
 
+**REDESIGN OVERRIDE RULES:**
+1. **IGNORE ALL EXISTING FILES** - Do NOT check App.jsx or any existing files
+2. **CREATE COMPLETE NEW STRUCTURE** - Build everything from scratch using the different schema
+3. **NO FILE COUNT LIMITS** - Create ALL necessary files for the new design
+4. **COMPLETE LAYOUT RESTRUCTURE** - Change the entire page structure, not just colors
+5. **NEW COMPONENT ARCHITECTURE** - Create new component relationships and hierarchy
+6. **FRESH CONTENT AND DESIGN** - Generate new content that matches the schema theme
+7. **IGNORE PREVIOUS DESIGNS** - Do not reference or preserve any existing design patterns
+
+**WHAT TO REDESIGN:**
+- Complete new Header with different navigation structure
+- New Hero section with different layout and content
+- New content sections with different arrangement
+- New Footer with different structure
+- New overall page flow and user experience
+- New component hierarchy and relationships
+- New responsive design patterns
+- New animations and interactions
+
+**REDESIGN CHECKLIST:**
+- [ ] Create completely new component structure
+- [ ] Implement new layout patterns from schema
+- [ ] Generate fresh content matching schema theme
+- [ ] Build new navigation and user flow
+- [ ] Create new visual hierarchy
+- [ ] Implement new responsive breakpoints
+- [ ] Add new animations and interactions
+- [ ] Ensure no reference to previous design
+` : isRegenerate ? `
+ **REGENERATION MODE - OVERRIDE ALL OTHER RULES**
+**YOU ARE CREATING A COMPLETELY NEW WEBSITE FROM SCRATCH**
+
+**REGENERATION OVERRIDE RULES:**
+1. **IGNORE ALL EXISTING FILES** - Do NOT check App.jsx or any existing files
+2. **CREATE COMPLETE NEW STRUCTURE** - Build everything from scratch using the new schema
+3. **NO FILE COUNT LIMITS** - Create ALL necessary files for the new design
+4. **COMPLETE LAYOUT RESTRUCTURE** - Change the entire page structure, not just colors
+5. **NEW COMPONENT ARCHITECTURE** - Create new component relationships and hierarchy
+6. **FRESH CONTENT AND DESIGN** - Generate new content that matches the schema theme
+7. **IGNORE PREVIOUS DESIGNS** - Do not reference or preserve any existing design patterns
+
+**WHAT TO REGENERATE:**
+- Complete new Header with different navigation structure
+- New Hero section with different layout and content
+- New content sections with different arrangement
+- New Footer with different structure
+- New overall page flow and user experience
+- New component hierarchy and relationships
+- New responsive design patterns
+- New animations and interactions
+
+**REGENERATION CHECKLIST:**
+- [ ] Create completely new component structure
+- [ ] Implement new layout patterns from schema
+- [ ] Generate fresh content matching schema theme
+- [ ] Build new navigation and user flow
+- [ ] Create new visual hierarchy
+- [ ] Implement new responsive breakpoints
+- [ ] Add new animations and interactions
+- [ ] Ensure no reference to previous design
+` : `
 1. **DO EXACTLY WHAT IS ASKED - NOTHING MORE, NOTHING LESS**
    - Don't add features not requested
    - Don't fix unrelated issues
@@ -911,6 +954,7 @@ COMPONENT RELATIONSHIPS (CHECK THESE FIRST):
 - Logo is typically in Header, not standalone
 - Footer often contains nav links already
 - Menu/Hamburger is part of Header, not separate
+`}
 
 PACKAGE USAGE RULES:
 - DO NOT use react-router-dom unless user explicitly asks for routing
@@ -918,33 +962,92 @@ PACKAGE USAGE RULES:
 - Only add routing if building a multi-page application
 - Common packages are auto-installed from your imports
 
+${isRegenerate ? `
+🔄 **REGENERATION WEBSITE REQUIREMENTS:**
+When regenerating a website, you MUST create:
+1. **NEW Header with NEW Navigation** - Completely different structure and layout
+2. **NEW Hero Section** - Different layout, content, and visual approach
+3. **NEW Content Sections** - Different arrangement, components, and flow
+4. **NEW Footer** - Different structure and content organization
+5. **NEW Overall Layout** - Different page structure and user flow
+6. **NEW Component Architecture** - Different component relationships and hierarchy
+7. **NEW Visual Design Language** - Different design patterns and aesthetics
+` : isRegenerate ? `
+🔄 **REGENERATION WEBSITE REQUIREMENTS:**
+When regenerating a website, you MUST create:
+1. **NEW Header with NEW Navigation** - Completely different structure and layout
+2. **NEW Hero Section** - Different layout, content, and visual approach
+3. **NEW Content Sections** - Different arrangement, components, and flow
+4. **NEW Footer** - Different structure and content organization
+5. **NEW Overall Layout** - Different page structure and user flow
+6. **NEW Component Architecture** - Different component relationships and hierarchy
+7. **NEW Visual Design Language** - Different design patterns and aesthetics
+` : `
 WEBSITE REQUIREMENTS:
 When creating a website, you MUST include:
 1. **Header with Navigation** - Usually Header.jsx containing nav
 2. **Hero Section** - The main landing area (Hero.jsx)
 3. **Main Content Sections** - Features, Services, About, etc.
 4. **Footer** - Contact info, links, copyright (Footer.jsx)
+`}
 
-${csvData ? `🎨 **${isRedesign ? 'DIFFERENT ' : ''}INTELLIGENTLY SELECTED CSV SCHEMA IMPLEMENTATION CHECKLIST:**
-- [ ] Implement all components specified in the ${isRedesign ? 'different ' : ''}intelligently selected CSV schema
+${schemaData ? `🎨 **${isRegenerate ? 'NEW ' : isRedesign ? 'DIFFERENT ' : ''}INTELLIGENTLY SELECTED SCHEMA IMPLEMENTATION CHECKLIST:**
+- [ ] Implement all components specified in the ${isRegenerate ? 'new ' : isRedesign ? 'different ' : ''}intelligently selected schema
 - [ ] Follow the exact page structure order
 - [ ] Apply the specified color schemes for each component
-- [ ] Use the typography specifications as defined
+- [ ] Use the exact typography specifications
 - [ ] Maintain the spacing and layout requirements
 - [ ] Ensure responsive design across all components
 - [ ] Follow the visual hierarchy as described
 - [ ] Implement any special visual notes or requirements
-${isRedesign ? '- [ ] Apply redesign to existing content structure using different intelligently selected schema' : ''}
+${isRedesign ? `
+🎨 **REDESIGN SPECIFIC CHECKLIST:**
+- [ ] Create completely new component structure (not just colors)
+- [ ] Implement new layout patterns from schema
+- [ ] Generate fresh content matching schema theme
+- [ ] Build new navigation and user flow
+- [ ] Create new visual hierarchy
+- [ ] Implement new responsive breakpoints
+- [ ] Add new animations and interactions
+- [ ] Ensure no reference to previous design patterns
+` : isRegenerate ? `
+🔄 **REGENERATION SPECIFIC CHECKLIST:**
+- [ ] Create completely new component structure (not just colors)
+- [ ] Implement new layout patterns from schema
+- [ ] Generate fresh content matching schema theme
+- [ ] Build new navigation and user flow
+- [ ] Create new visual hierarchy
+- [ ] Implement new responsive breakpoints
+- [ ] Add new animations and interactions
+- [ ] Ensure no reference to previous design patterns
+` : ''}
 - [ ] Use scraped content for text/content if available` : ''}
 
-${isRedesign ? ` **REDESIGN MODE CRITICAL REQUIREMENTS:**
-- You MUST generate complete files with the new design
+${isRegenerate ? `
+ **REGENERATION MODE CRITICAL REQUIREMENTS:**
+- You MUST generate complete files with COMPLETELY NEW design and structure
+- Do not just change colors - CREATE NEW LAYOUT AND COMPONENTS
+- Apply the NEW schema design to create fresh component architecture
+- Generate NEW content that matches the schema theme
+- Create NEW navigation and user flow patterns
+- Build NEW responsive design patterns
+- Implement NEW animations and interactions
+- Generate ALL necessary files with the new design system
+- This is a COMPLETE REGENERATION, not just a theme change
+` : isRedesign ? `
+ **REDESIGN MODE CRITICAL REQUIREMENTS - COMPLETE REBUILD:**
+- You MUST generate complete files with the NEW design system
 - Do not just describe changes - CREATE THE ACTUAL CODE
-- Apply the DIFFERENT intelligently selected CSV schema design to existing components
-- Keep all content and functionality intact
-- Only change the visual design and styling
-- Generate ALL necessary files with the new design applied
-- This schema is DIFFERENT from the previous one used` : ''}`;
+- Apply the DIFFERENT intelligently selected schema design to create NEW components
+- **DISCARD ALL EXISTING CONTENT AND FUNCTIONALITY** - create completely new content
+- **CREATE NEW LAYOUT STRUCTURE** - different page organization and flow
+- **GENERATE NEW COMPONENT ARCHITECTURE** - different component hierarchy
+- **BUILD NEW NAVIGATION PATTERNS** - different user experience flow
+- **CREATE NEW VISUAL DESIGN** - different colors, typography, spacing, layout
+- Generate ALL necessary files with the completely new design system
+- This schema is DIFFERENT from the previous one used
+- **THIS IS A COMPLETE REBUILD, NOT A THEME CHANGE**
+` : ''}`;
 
         // Build full prompt with context
         let fullPrompt = prompt;
@@ -1049,7 +1152,7 @@ ${isRedesign ? ` **REDESIGN MODE CRITICAL REQUIREMENTS:**
           }
 
           // Include current file contents from backend cache
-          if (hasBackendFiles) {
+          if (hasBackendFiles && !isRegenerate && !isRedesign) {
             // If we have edit context, use intelligent file selection
             if (editContext && editContext.primaryFiles.length > 0) {
               contextParts.push('\nEXISTING APPLICATION - TARGETED EDIT MODE');
@@ -1109,6 +1212,12 @@ ${isRedesign ? ` **REDESIGN MODE CRITICAL REQUIREMENTS:**
               contextParts.push('If you DELETE or REWRITE existing functionality, you have FAILED');
               contextParts.push('ONLY change what was EXPLICITLY requested - NOTHING MORE');
             }
+          } else if (isRegenerate || isRedesign) {
+            contextParts.push('\n REGENERATION/REDESIGN MODE - IGNORE EXISTING FILES');
+            contextParts.push('You are creating a COMPLETELY NEW website from scratch.');
+            contextParts.push('DO NOT reference or preserve any existing file content.');
+            contextParts.push('Use the NEW schema design to build everything fresh.');
+            contextParts.push('Create all necessary components with the new design system.');
           } else if (context.currentFiles && Object.keys(context.currentFiles).length > 0) {
             console.log('[generate-ai-code-stream] Warning: Backend cache empty, using frontend files');
             contextParts.push('\nEXISTING APPLICATION - DO NOT REGENERATE FROM SCRATCH');
@@ -1123,7 +1232,7 @@ ${isRedesign ? ` **REDESIGN MODE CRITICAL REQUIREMENTS:**
             contextParts.push('\nThe above files already exist. When the user asks to modify something (like "change the header color to black"), find the relevant file above and generate ONLY that file with the requested changes.');
           }
 
-          if (isEdit) {
+          if (isEdit && !isRegenerate) {
             contextParts.push('\nEDIT MODE ACTIVE');
             contextParts.push('This is an incremental update to an existing application.');
             contextParts.push('DO NOT regenerate App.jsx, index.css, or other core files unless explicitly requested.');
@@ -1140,6 +1249,21 @@ ${isRedesign ? ` **REDESIGN MODE CRITICAL REQUIREMENTS:**
             contextParts.push('⚠️ NEVER LIST FILE NAMES WITHOUT CONTENT');
             contextParts.push('✅ ALWAYS: One <file> tag per file with COMPLETE content');
             contextParts.push('✅ ALWAYS: Include EVERY file you modified');
+          } else if (isRegenerate) {
+            contextParts.push('\n🔄 REGENERATION MODE ACTIVE');
+            contextParts.push('This is a COMPLETE REGENERATION - create everything from scratch!');
+            contextParts.push('IGNORE all existing files and create a completely new design.');
+            contextParts.push('Use the NEW schema design to build a fresh website.');
+            contextParts.push('Create ALL necessary components with the new design system.');
+            contextParts.push('\n⚠️ CRITICAL REGENERATION INSTRUCTIONS:');
+            contextParts.push('- DO NOT reference or preserve existing file content');
+            contextParts.push('- DO NOT try to modify existing files');
+            contextParts.push('- CREATE COMPLETELY NEW files with new design');
+            contextParts.push('- APPLY the new schema design system throughout');
+            contextParts.push('- BUILD from scratch using the schema specifications');
+            contextParts.push('\n⚠️ OUTPUT FORMAT:');
+            contextParts.push('Use <file path="...">content</file> tags for ALL new files');
+            contextParts.push('Create complete, working components with the new design');
           } else if (!hasBackendFiles) {
             contextParts.push('\n🎨 FIRST GENERATION MODE - CREATE SOMETHING BEAUTIFUL!');
             contextParts.push('\nThis is the user\'s FIRST experience. Make it impressive:');
@@ -1148,7 +1272,7 @@ ${isRedesign ? ` **REDESIGN MODE CRITICAL REQUIREMENTS:**
             contextParts.push('3. **COMPLETE COMPONENTS** - Header, Hero, Features, Footer minimum');
             contextParts.push('4. **VISUAL POLISH** - Shadows, hover states, transitions');
             contextParts.push('5. **STANDARD CLASSES** - bg-white, text-gray-900, bg-blue-500, NOT bg-background');
-            contextParts.push('6. **FOLLOW CSV SCHEMA** - If available, follow the design specifications exactly');
+            contextParts.push('6. **FOLLOW SCHEMA** - If available, follow the design specifications exactly');
             contextParts.push('\nCreate a polished, professional application that works perfectly on first load.');
             contextParts.push('\n⚠️ OUTPUT FORMAT:');
             contextParts.push('Use <file path="...">content</file> tags for EVERY file');

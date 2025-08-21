@@ -3418,29 +3418,26 @@ Focus on creating a website that embodies the business's brand identity and effe
     setActiveTab('generation');
 
     try {
-      // Update the redesign prompt to be more aggressive
-      const redesignPrompt = `🚨 COMPLETE REDESIGN REQUEST: Redesign this website from scratch using a DIFFERENT random design schema from the CSV file.
+      // Enhanced redesign prompt with stronger instructions for complete UI/UX restructuring
+      const redesignPrompt = `🚨 COMPLETE REBUILD & REPLACE: Recreate this website from scratch with a new design, new content, and new functionality.
 
-CRITICAL REDESIGN INSTRUCTIONS:
-1. **SELECT A DIFFERENT RANDOM SCHEMA** from the CSV file (not the same one used before)
-2. **COMPLETELY REDESIGN THE ENTIRE WEBSITE** using the different schema's design system
-3. **CHANGE ALL VISUAL ELEMENTS** - colors, typography, spacing, layout, design patterns
-4. **KEEP ALL CONTENT AND FUNCTIONALITY** - only change the visual appearance
-5. **GENERATE COMPLETE NEW FILES** with the redesigned code
-6. **MAKE IT RESPONSIVE AND MODERN** with the new design
+**CRITICAL INSTRUCTIONS - OVERRIDE ALL PREVIOUS CONTEXT:**
+1.  **DELETE & REPLACE:** Your first action is to completely remove/delete all existing files.
+2.  **SELECT A DESIGN SCHEMA:** Choose a random design schema from the CSV file to define the new visual style.
+3.  **REBUILD FROM SCRATCH:** Generate entirely new files from a blank slate.
+4.  **REPLACE ALL VISUALS:** Using the new schema, create a new visual identity—colors, typography, spacing, layout, and components.
+5.  **REPLACE ALL CONTENT & FUNCTIONALITY:** Discard all original text and features. Generate new, relevant placeholder content and introduce improved functionalities appropriate for the new design.
+6.  **ENSURE RESPONSIVENESS:** The new build must be modern and fully responsive.
 
-WHAT YOU MUST DO:
-- **ANALYZE THE DIFFERENT RANDOM SCHEMA** - understand its complete design system
-- **REDESIGN HEADER** - apply new schema's navigation design and styling
-- **REDESIGN HERO** - apply new schema's hero section design and layout
-- **REDESIGN ALL SECTIONS** - apply new schema's component designs and styles
-- **REDESIGN FOOTER** - apply new schema's footer design and layout
-- **CHANGE ALL COLORS** - use the new schema's color palette throughout
-- **CHANGE ALL TYPOGRAPHY** - use the new schema's font styles and weights
-- **CHANGE ALL SPACING** - use the new schema's padding, margins, and layout
-- **GENERATE COMPLETE FILES** - create all redesigned components
+**EXECUTION WORKFLOW - FULL-SCOPE REIMAGINATION:**
+- **FILE OPERATION:** Discard all old code and files entirely. Start fresh.
+- **NEW SCHEMA ANALYSIS:** Thoroughly analyze the chosen schema to build the new design system.
+- **REBUILD ALL COMPONENTS:** Recreate the Header, Hero, body sections, and Footer with new layouts and features.
+- **GENERATE NEW CONTENT:** Populate the new components with relevant, high-quality placeholder text and images.
+- **IMPLEMENT NEW STYLES:** Apply the new schema's colors, typography, and spacing rules consistently.
+- **GENERATE NEW, COMPLETE FILE(S):** Output the full code for the brand-new website.
 
-**MANDATORY:** This is a COMPLETE REDESIGN from scratch. You must transform the entire visual appearance using the different random schema. Do not keep the same design - create something completely new!`;
+**MANDATORY:** This is a "tear-down and rebuild" operation. Nothing from the original implementation—visuals, content, or functionality—should be preserved. Create a completely new product.`;
 
       const response = await fetch('/api/generate-ai-code-stream', {
         method: 'POST',
@@ -3454,7 +3451,7 @@ WHAT YOU MUST DO:
             conversationContext: conversationContext,
             currentFiles: sandboxFiles
           },
-          isEdit: true, // This will trigger the redesign mode
+          isEdit: false, // Changed from true to false - this prevents the system from providing existing files and preservation instructions
           url: null // Ensure we use intelligent CSV schema selection
         })
       });
