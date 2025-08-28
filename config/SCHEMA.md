@@ -3511,3 +3511,2600 @@ Schema: {
     {"component": "footer", "order": 13}  
   ]  
 }
+
+12- Url: [https://www.clinique.com/des-champs-elysees/](https://www.clinique.com/des-champs-elysees/)  
+Schema: {  
+  "components": {  
+    "header_nav": {  
+      "type": "nav",  
+      "description": "Top navigation bar with logo on left, links centered, and language/login icons on right.",  
+      "typography": {  
+        "links": {  
+          "visual_description": "Small uppercase sans-serif text",  
+          "weight": "regular",  
+          "letter_spacing": "wide",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "small vertical, medium horizontal",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "black",  
+        "accent": "gray hover underline"  
+      },  
+      "image_style": "monochrome logo",  
+      "other_visual_notes": "Fixed transparent background over hero"  
+    },  
+    "hero_banner": {  
+      "type": "hero",  
+      "description": "Full-width dark-toned hero with black-and-white photo background, central text overlay, and call-to-action button.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "Large bold white sans-serif",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        },  
+        "body": {  
+          "visual_description": "Medium white sans-serif",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "black overlay on grayscale photo",  
+        "text": "white",  
+        "accent": "light gray hover on button"  
+      },  
+      "image_style": "high-contrast monochrome imagery",  
+      "other_visual_notes": "Centered CTA button with rounded edges"  
+    },  
+    "stats_section": {  
+      "type": "layout",  
+      "description": "Three-column black background with bold large numeric stats and white text labels.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "Extra-large outlined numerals",  
+          "weight": "bold",  
+          "letter_spacing": "wide",  
+          "text_transform": "none"  
+        },  
+        "body": {  
+          "visual_description": "Small white sans-serif for labels",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "medium vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "black",  
+        "text": "white",  
+        "accent": "none"  
+      },  
+      "image_style": "none",  
+      "other_visual_notes": "Minimalistic, evenly spaced numbers"  
+    },  
+    "who_we_are": {  
+      "type": "text_block",  
+      "description": "Centered white paragraph text on black background with highlighted bold phrases.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "Small uppercase white title",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "uppercase"  
+        },  
+        "body": {  
+          "visual_description": "Small white sans-serif paragraphs with occasional bolding",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "medium",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "black",  
+        "text": "white",  
+        "accent": "light gray for emphasis"  
+      },  
+      "image_style": "none",  
+      "other_visual_notes": "Blocks of text are tightly set"  
+    },  
+    "highlight_treatment": {  
+      "type": "card",  
+      "description": "Large image-based card with overlay text and CTA button in corner.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "Medium white bold sans-serif",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        },  
+        "body": {  
+          "visual_description": "Small white sans-serif text overlay",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "small inside overlay",  
+        "margin": "medium bottom"  
+      },  
+      "colors": {  
+        "background": "photo with black overlay",  
+        "text": "white",  
+        "accent": "transparent white button"  
+      },  
+      "image_style": "high-resolution photography",  
+      "other_visual_notes": "Button aligned bottom left"  
+    },  
+    "treatment_overview": {  
+      "type": "grid",  
+      "description": "Two-column grid: left with image and intro text, right with vertical accordion menu.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "Medium black sans-serif",  
+          "weight": "semibold",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        },  
+        "body": {  
+          "visual_description": "Small black sans-serif text",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "black",  
+        "accent": "light gray divider lines"  
+      },  
+      "image_style": "editorial-style photo",  
+      "other_visual_notes": "Accordion with plus icons on right side"  
+    },  
+    "treatment_cards": {  
+      "type": "card_grid",  
+      "description": "Four-column grid of image cards with treatment names and subtle buttons.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "Small bold black sans-serif",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        },  
+        "body": {  
+          "visual_description": "Very small gray sans-serif labels",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "small around cards",  
+        "margin": "medium vertical"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "black",  
+        "accent": "soft gray borders"  
+      },  
+      "image_style": "clean clinical photography",  
+      "other_visual_notes": "Card hover states with subtle highlight"  
+    },  
+    "press_section": {  
+      "type": "logo_row",  
+      "description": "Horizontal row of press logos in grayscale on white background.",  
+      "typography": {  
+        "body": {  
+          "visual_description": "Logos only, no text",  
+          "weight": "n/a",  
+          "letter_spacing": "n/a",  
+          "text_transform": "n/a"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "medium vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "black",  
+        "accent": "none"  
+      },  
+      "image_style": "flat grayscale logos",  
+      "other_visual_notes": "Even spacing between logos"  
+    },  
+    "news_slider": {  
+      "type": "carousel",  
+      "description": "Horizontal carousel of news cards with images, titles, and short text.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "Small bold black sans-serif",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        },  
+        "body": {  
+          "visual_description": "Very small gray sans-serif paragraphs",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "medium vertical",  
+        "margin": "medium top bottom"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "black",  
+        "accent": "gray navigation arrows"  
+      },  
+      "image_style": "small rectangular photos",  
+      "other_visual_notes": "Circular arrow navigation"  
+    },  
+    "instagram_gallery": {  
+      "type": "grid",  
+      "description": "Six-image grid of Instagram posts with hover effect.",  
+      "typography": {  
+        "body": {  
+          "visual_description": "No text, only images",  
+          "weight": "n/a",  
+          "letter_spacing": "n/a",  
+          "text_transform": "n/a"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "medium vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "none",  
+        "accent": "none"  
+      },  
+      "image_style": "Instagram square photos",  
+      "other_visual_notes": "Uniform spacing and square ratio"  
+    },  
+    "footer": {  
+      "type": "footer",  
+      "description": "Dark background footer with multiple link columns, contact info, and bottom copyright.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "Small bold white uppercase",  
+          "weight": "bold",  
+          "letter_spacing": "wide",  
+          "text_transform": "uppercase"  
+        },  
+        "body": {  
+          "visual_description": "Small light gray sans-serif",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "black",  
+        "text": "white and gray",  
+        "accent": "light gray hover links"  
+      },  
+      "image_style": "white monochrome social icons",  
+      "other_visual_notes": "Structured into link groups"  
+    }  
+  },  
+  "page_structure": [  
+    {"component": "header_nav", "order": 1},  
+    {"component": "hero_banner", "order": 2},  
+    {"component": "stats_section", "order": 3},  
+    {"component": "who_we_are", "order": 4},  
+    {"component": "highlight_treatment", "order": 5},  
+    {"component": "treatment_overview", "order": 6},  
+    {"component": "treatment_cards", "order": 7},  
+    {"component": "press_section", "order": 8},  
+    {"component": "news_slider", "order": 9},  
+    {"component": "instagram_gallery", "order": 10},  
+    {"component": "footer", "order": 11}  
+  ]  
+}
+
+13- Url: [https://www.donaldsonplasticsurgery.com/](https://www.donaldsonplasticsurgery.com/)  
+Schema: {  
+  "components": {  
+    "hero_banner": {  
+      "type": "hero",  
+      "description": "Full-width hero image with centered overlay text",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "Serif font, large size, light gray color, centered",  
+          "weight": "light",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical padding inside image",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "photographic skin-tone image",  
+        "text": "soft white"  
+      },  
+      "image_style": "full-bleed, muted tones, soft focus",  
+      "other_visual_notes": "Minimalist overlay text, elegant and calm aesthetic"  
+    },  
+    "intro_section": {  
+      "type": "text_block",  
+      "description": "Centered text section with small icon above",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "All caps, small sans-serif, muted dark gray",  
+          "weight": "medium",  
+          "letter_spacing": "wide",  
+          "text_transform": "uppercase"  
+        },  
+        "body": {  
+          "visual_description": "Small serif body text, centered, dark gray",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "medium vertical padding",  
+        "margin": "separated from hero and next section with white space"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "charcoal gray",  
+        "accent": "teal circular icon"  
+      },  
+      "image_style": "simple icon above heading",  
+      "other_visual_notes": "Minimal icon and clean typography hierarchy"  
+    },  
+    "service_card_grid": {  
+      "type": "card grid",  
+      "description": "Three-column image grid with overlaid text descriptions",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "Small sans-serif headings above images",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "tight padding around cards",  
+        "margin": "generous white space separating grid from other sections"  
+      },  
+      "colors": {  
+        "background": "soft beige",  
+        "text": "dark gray"  
+      },  
+      "image_style": "portrait and detail photography, high contrast lighting",  
+      "other_visual_notes": "Asymmetric grid layout with large and small images"  
+    },  
+    "about_section": {  
+      "type": "text_image",  
+      "description": "Split layout with text on left and doctor portraits on right",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "Serif heading, medium size, dark color",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        },  
+        "body": {  
+          "visual_description": "Small serif body text, dark gray",  
+          "weight": "light",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "medium",  
+        "margin": "white space around section"  
+      },  
+      "colors": {  
+        "background": "light cream",  
+        "text": "charcoal gray"  
+      },  
+      "image_style": "studio portraits on neutral background",  
+      "other_visual_notes": "Balance of human imagery and narrative"  
+    },  
+    "testimonial_section": {  
+      "type": "review grid",  
+      "description": "Three-column card grid with patient testimonials",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "All caps serif section heading, medium size",  
+          "weight": "medium",  
+          "letter_spacing": "wide",  
+          "text_transform": "uppercase"  
+        },  
+        "body": {  
+          "visual_description": "Serif review text, italic quotes, dark gray",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "ample spacing between cards",  
+        "margin": "separated by cream background"  
+      },  
+      "colors": {  
+        "background": "off-white",  
+        "text": "dark gray",  
+        "accent": "light gray stars"  
+      },  
+      "image_style": "minimal icons only",  
+      "other_visual_notes": "Clean grid with subtle dividers"  
+    },  
+    "commitment_section": {  
+      "type": "text_image",  
+      "description": "Two-column layout with doctor-patient image and accompanying text",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "Serif heading, medium size, dark gray",  
+          "weight": "medium",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        },  
+        "body": {  
+          "visual_description": "Smaller serif body text, balanced line spacing",  
+          "weight": "light",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "medium",  
+        "margin": "well-separated section with cream background"  
+      },  
+      "colors": {  
+        "background": "light cream",  
+        "text": "charcoal gray"  
+      },  
+      "image_style": "candid photo in clinical setting",  
+      "other_visual_notes": "Balanced professional and approachable tone"  
+    },  
+    "values_icons_section": {  
+      "type": "icon grid",  
+      "description": "Three-column grid with minimalist line icons and short text captions",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "Small sans-serif headings below icons",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "generous spacing around icons",  
+        "margin": "section isolated with white space"  
+      },  
+      "colors": {  
+        "background": "off-white",  
+        "text": "dark gray",  
+        "accent": "subtle gray line icons"  
+      },  
+      "image_style": "minimalist line icons",  
+      "other_visual_notes": "Evenly spaced, airy grid layout"  
+    },  
+    "cta_banner": {  
+      "type": "call_to_action",  
+      "description": "Full-width colored banner with CTA button",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "White serif text, large size",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical padding",  
+        "margin": "spaced between sections"  
+      },  
+      "colors": {  
+        "background": "deep teal blue",  
+        "text": "white",  
+        "accent": "white outline button"  
+      },  
+      "image_style": "none",  
+      "other_visual_notes": "Simple and bold, strong color contrast"  
+    },  
+    "footer": {  
+      "type": "footer",  
+      "description": "Multi-column footer with navigation links, contact info, certifications, and legal text",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "Small caps, sans-serif for section titles",  
+          "weight": "medium",  
+          "letter_spacing": "wide",  
+          "text_transform": "uppercase"  
+        },  
+        "body": {  
+          "visual_description": "Small serif text, muted gray",  
+          "weight": "light",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "medium vertical padding",  
+        "margin": "separated from main content with space"  
+      },  
+      "colors": {  
+        "background": "light beige",  
+        "text": "charcoal gray",  
+        "accent": "dark gray links"  
+      },  
+      "image_style": "small grayscale logos",  
+      "other_visual_notes": "Dense structured layout, balanced readability"  
+    }  
+  },  
+  "page_structure": [  
+    {"component": "hero_banner", "order": 1},  
+    {"component": "intro_section", "order": 2},  
+    {"component": "service_card_grid", "order": 3},  
+    {"component": "about_section", "order": 4},  
+    {"component": "testimonial_section", "order": 5},  
+    {"component": "commitment_section", "order": 6},  
+    {"component": "values_icons_section", "order": 7},  
+    {"component": "cta_banner", "order": 8},  
+    {"component": "footer", "order": 9}  
+  ]  
+}
+
+14- Url: [https://www.gawleyplasticsurgery.com/](https://www.gawleyplasticsurgery.com/)  
+Schema: {  
+  "components": {  
+    "top_bar": {  
+      "type": "nav",  
+      "description": "Thin strip with contact details, social icons, and quick links",  
+      "typography": {  
+        "body": {  
+          "visual_description": "Small sans-serif text, uppercase, white on dark background",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "tight vertical padding",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "dark charcoal",  
+        "text": "white",  
+        "accent": "light gray icons"  
+      },  
+      "image_style": "small icons",  
+      "other_visual_notes": "Compact and functional strip above main nav"  
+    },  
+    "main_nav": {  
+      "type": "nav",  
+      "description": "Centered logo on left, horizontal menu with CTA button on right",  
+      "typography": {  
+        "body": {  
+          "visual_description": "Sans-serif uppercase navigation text, medium size",  
+          "weight": "medium",  
+          "letter_spacing": "normal",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "medium vertical padding",  
+        "margin": "aligned to edges with equal spacing"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "black",  
+        "accent": "gold CTA button"  
+      },  
+      "image_style": "monogram-style logo",  
+      "other_visual_notes": "Clean, professional aesthetic"  
+    },  
+    "hero_banner": {  
+      "type": "hero",  
+      "description": "Full-width hero with video still or photo background and centered text overlay",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "Large sans-serif text, white, centered",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical padding",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "photographic image of doctor and patient",  
+        "text": "white"  
+      },  
+      "image_style": "professional candid photography",  
+      "other_visual_notes": "Overlay has subtle gradient for readability"  
+    },  
+    "brand_logos_strip": {  
+      "type": "logo strip",  
+      "description": "Horizontal strip of partner/association logos",  
+      "typography": {},  
+      "spacing": {  
+        "padding": "tight vertical spacing",  
+        "margin": "below hero"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "gray logos"  
+      },  
+      "image_style": "grayscale logos",  
+      "other_visual_notes": "Evenly spaced, clean and neutral"  
+    },  
+    "service_highlights": {  
+      "type": "icon grid",  
+      "description": "Three-column grid with minimalist icons and headings for services",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "Sans-serif uppercase small text under icons",  
+          "weight": "medium",  
+          "letter_spacing": "normal",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "medium",  
+        "margin": "white space separating"  
+      },  
+      "colors": {  
+        "background": "light gray-white",  
+        "text": "charcoal gray"  
+      },  
+      "image_style": "line icons",  
+      "other_visual_notes": "Minimalist design with clear grid"  
+    },  
+    "doctors_section": {  
+      "type": "text_image",  
+      "description": "Three-column portraits with doctor names and titles",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "Serif heading above images, dark gray",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        },  
+        "body": {  
+          "visual_description": "Small sans-serif for names/titles",  
+          "weight": "light",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "medium vertical spacing",  
+        "margin": "white space around"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "charcoal gray"  
+      },  
+      "image_style": "studio portraits, clean background",  
+      "other_visual_notes": "Balanced grid layout"  
+    },  
+    "pyramid_section": {  
+      "type": "graphic",  
+      "description": "Large triangular diagram representing rejuvenation steps",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "Serif heading, medium size, dark gray",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        },  
+        "body": {  
+          "visual_description": "Small serif text, muted gray",  
+          "weight": "light",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "generous spacing around graphic",  
+        "margin": "section separated by white space"  
+      },  
+      "colors": {  
+        "background": "off-white",  
+        "text": "dark gray",  
+        "accent": "subtle gold highlights"  
+      },  
+      "image_style": "line graphic pyramid diagram",  
+      "other_visual_notes": "Informational visual hierarchy"  
+    },  
+    "before_after_section": {  
+      "type": "image_comparison",  
+      "description": "Two-column before and after photo layout with descriptive text",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "Serif heading, dark gray",  
+          "weight": "medium",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        },  
+        "body": {  
+          "visual_description": "Small serif text, muted gray",  
+          "weight": "light",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "medium",  
+        "margin": "section separated by white space"  
+      },  
+      "colors": {  
+        "background": "light cream",  
+        "text": "charcoal gray"  
+      },  
+      "image_style": "before/after photography",  
+      "other_visual_notes": "Strong transformation contrast"  
+    },  
+    "treatment_categories": {  
+      "type": "image grid",  
+      "description": "Three-column grid with large photographic tiles labeled Face, Breast, Body",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "Bold serif overlaid on images",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "none",  
+        "margin": "tight grid layout"  
+      },  
+      "colors": {  
+        "background": "photographic tiles",  
+        "text": "white"  
+      },  
+      "image_style": "editorial style photography",  
+      "other_visual_notes": "Overlay text with subtle gradient"  
+    },  
+    "instagram_feed": {  
+      "type": "social grid",  
+      "description": "Instagram image carousel with clickable thumbnails",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "Small sans-serif heading above feed",  
+          "weight": "medium",  
+          "letter_spacing": "normal",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "medium",  
+        "margin": "separated from surrounding sections"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "dark gray"  
+      },  
+      "image_style": "user-generated Instagram images",  
+      "other_visual_notes": "Grid layout with embedded social content"  
+    },  
+    "cta_banner": {  
+      "type": "call_to_action",  
+      "description": "Two-column split layout with doctor portrait and dark overlay text block",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "Large serif text in white",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        },  
+        "body": {  
+          "visual_description": "Small white text below heading",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical padding",  
+        "margin": "clear separation from footer"  
+      },  
+      "colors": {  
+        "background": "dark gradient overlay",  
+        "text": "white",  
+        "accent": "gold button"  
+      },  
+      "image_style": "portrait photo beside dark overlay block",  
+      "other_visual_notes": "High contrast and polished professional appeal"  
+    },  
+    "newsletter_signup": {  
+      "type": "form",  
+      "description": "Full-width mailing list form with three input fields and button",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "Sans-serif heading, medium size, dark gray",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        },  
+        "body": {  
+          "visual_description": "Small form labels, muted gray",  
+          "weight": "light",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "medium vertical padding",  
+        "margin": "between CTA banner and footer"  
+      },  
+      "colors": {  
+        "background": "light gray",  
+        "text": "charcoal gray",  
+        "accent": "dark button"  
+      },  
+      "image_style": "none",  
+      "other_visual_notes": "Clean, minimal form fields with equal spacing"  
+    },  
+    "footer": {  
+      "type": "footer",  
+      "description": "Multi-column footer with logo, navigation, contact info, and legal text",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "Small caps sans-serif for section headings",  
+          "weight": "medium",  
+          "letter_spacing": "wide",  
+          "text_transform": "uppercase"  
+        },  
+        "body": {  
+          "visual_description": "Small serif text, muted gray",  
+          "weight": "light",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "medium",  
+        "margin": "separated by top border"  
+      },  
+      "colors": {  
+        "background": "dark charcoal",  
+        "text": "white",  
+        "accent": "light gray links"  
+      },  
+      "image_style": "small grayscale logos",  
+      "other_visual_notes": "Compact, structured, professional"  
+    }  
+  },  
+  "page_structure": [  
+    {"component": "top_bar", "order": 1},  
+    {"component": "main_nav", "order": 2},  
+    {"component": "hero_banner", "order": 3},  
+    {"component": "brand_logos_strip", "order": 4},  
+    {"component": "service_highlights", "order": 5},  
+    {"component": "doctors_section", "order": 6},  
+    {"component": "pyramid_section", "order": 7},  
+    {"component": "before_after_section", "order": 8},  
+    {"component": "treatment_categories", "order": 9},  
+    {"component": "instagram_feed", "order": 10},  
+    {"component": "cta_banner", "order": 11},  
+    {"component": "newsletter_signup", "order": 12},  
+    {"component": "footer", "order": 13}  
+  ]  
+}
+
+15- Url: [https://www.kontourmedspa.com/](https://www.kontourmedspa.com/)  
+Schema: {  
+  "components": {  
+    "top_navigation": {  
+      "type": "nav",  
+      "description": "Transparent navigation bar overlayed on hero image with logo left, links center, icons right.",  
+      "typography": {  
+        "menu_item": {  
+          "visual_description": "small uppercase serif-like text",  
+          "weight": "regular",  
+          "letter_spacing": "slight",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "small vertical, medium horizontal",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "transparent",  
+        "text": "white",  
+        "accent": "none"  
+      },  
+      "image_style": "logo left aligned",  
+      "other_visual_notes": "navigation overlay on hero"  
+    },  
+    "hero_banner": {  
+      "type": "hero",  
+      "description": "Full-width hero with close-up portrait and centered large heading text.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "large elegant serif font, white text",  
+          "weight": "regular",  
+          "letter_spacing": "wide",  
+          "text_transform": "capitalized"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "extra large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "photographic portrait",  
+        "text": "white",  
+        "accent": "none"  
+      },  
+      "image_style": "high-quality portrait background",  
+      "other_visual_notes": "soft overlay gradient on image"  
+    },  
+    "intro_section": {  
+      "type": "section",  
+      "description": "Two-column layout with left-aligned portrait photo and right-aligned block of heading and text.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "medium serif heading",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "capitalize"  
+        },  
+        "body": {  
+          "visual_description": "small serif body text, justified",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large",  
+        "margin": "large vertical"  
+      },  
+      "colors": {  
+        "background": "beige",  
+        "text": "black",  
+        "accent": "burgundy highlights"  
+      },  
+      "image_style": "rectangular portrait with soft shadows",  
+      "other_visual_notes": "block overlay slightly lifted with shadow"  
+    },  
+    "service_highlights": {  
+      "type": "section",  
+      "description": "Three-column grid with model portraits and overlay text labels.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "small uppercase overlay text in white",  
+          "weight": "bold",  
+          "letter_spacing": "spaced",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "medium",  
+        "margin": "large vertical"  
+      },  
+      "colors": {  
+        "background": "beige",  
+        "text": "white",  
+        "accent": "none"  
+      },  
+      "image_style": "photographic tiles",  
+      "other_visual_notes": "overlay text bottom aligned"  
+    },  
+    "experience_section": {  
+      "type": "section",  
+      "description": "Centered text block with heading, body text, and CTA button.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "medium serif centered heading",  
+          "weight": "semi-bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "capitalize"  
+        },  
+        "body": {  
+          "visual_description": "small serif paragraph text",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "medium",  
+        "margin": "large vertical"  
+      },  
+      "colors": {  
+        "background": "light beige",  
+        "text": "black",  
+        "accent": "taupe button"  
+      },  
+      "image_style": "none",  
+      "other_visual_notes": "center aligned"  
+    },  
+    "founder_section": {  
+      "type": "section",  
+      "description": "Two-column layout with left-aligned portrait and right-aligned text block introducing founder.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "medium serif heading",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "capitalize"  
+        },  
+        "body": {  
+          "visual_description": "small serif text block",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large",  
+        "margin": "large vertical"  
+      },  
+      "colors": {  
+        "background": "beige",  
+        "text": "black",  
+        "accent": "taupe button"  
+      },  
+      "image_style": "professional portrait",  
+      "other_visual_notes": "image and card layout aligned horizontally"  
+    },  
+    "results_section": {  
+      "type": "section",  
+      "description": "Side-by-side layout with portrait on right and text on left with list of results.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "serif heading, medium size",  
+          "weight": "semi-bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "capitalize"  
+        },  
+        "list": {  
+          "visual_description": "small serif bulleted list",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large",  
+        "margin": "large vertical"  
+      },  
+      "colors": {  
+        "background": "light beige",  
+        "text": "black",  
+        "accent": "taupe highlights"  
+      },  
+      "image_style": "close-up portrait",  
+      "other_visual_notes": "text card floating over background"  
+    },  
+    "partners_section": {  
+      "type": "section",  
+      "description": "Grid of partner logos in monochrome style on light beige background.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "none",  
+          "weight": "",  
+          "letter_spacing": "",  
+          "text_transform": ""  
+        }  
+      },  
+      "spacing": {  
+        "padding": "medium",  
+        "margin": "large vertical"  
+      },  
+      "colors": {  
+        "background": "light beige",  
+        "text": "gray",  
+        "accent": "none"  
+      },  
+      "image_style": "flat brand logos",  
+      "other_visual_notes": "center aligned logos"  
+    },  
+    "testimonial_section": {  
+      "type": "section",  
+      "description": "Two-column layout with left-aligned portrait and right text block with heading, body, and CTA.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "serif heading",  
+          "weight": "semi-bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "capitalize"  
+        },  
+        "body": {  
+          "visual_description": "small serif paragraph",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large",  
+        "margin": "large vertical"  
+      },  
+      "colors": {  
+        "background": "beige",  
+        "text": "black",  
+        "accent": "taupe button"  
+      },  
+      "image_style": "portrait image left",  
+      "other_visual_notes": "text card overlay"  
+    },  
+    "exceptional_section": {  
+      "type": "section",  
+      "description": "Side-by-side split with left aligned text block and right aligned portrait.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "medium serif heading",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "capitalize"  
+        },  
+        "body": {  
+          "visual_description": "small serif body text",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large",  
+        "margin": "large vertical"  
+      },  
+      "colors": {  
+        "background": "light beige",  
+        "text": "black",  
+        "accent": "taupe highlights"  
+      },  
+      "image_style": "editorial portrait",  
+      "other_visual_notes": "split section with equal halves"  
+    },  
+    "advanced_applications": {  
+      "type": "section",  
+      "description": "Full-width centered text block with heading and two-column body copy.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "medium serif heading, centered",  
+          "weight": "semi-bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "capitalize"  
+        },  
+        "body": {  
+          "visual_description": "small serif paragraphs, two-column",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "extra large",  
+        "margin": "large vertical"  
+      },  
+      "colors": {  
+        "background": "beige",  
+        "text": "black",  
+        "accent": "none"  
+      },  
+      "image_style": "none",  
+      "other_visual_notes": "clean editorial style"  
+    },  
+    "social_cta": {  
+      "type": "cta",  
+      "description": "Full-width banner with taupe background, centered social media icons, and heading.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "medium serif text, white",  
+          "weight": "semi-bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "capitalize"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large",  
+        "margin": "large vertical"  
+      },  
+      "colors": {  
+        "background": "taupe brown",  
+        "text": "white",  
+        "accent": "white icons"  
+      },  
+      "image_style": "social icons flat white",  
+      "other_visual_notes": "center aligned"  
+    },  
+    "footer": {  
+      "type": "footer",  
+      "description": "Dark brown footer with location info, navigation links, and copyright line.",  
+      "typography": {  
+        "body": {  
+          "visual_description": "small uppercase serif text",  
+          "weight": "regular",  
+          "letter_spacing": "spaced",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "dark brown",  
+        "text": "white",  
+        "accent": "light beige highlights"  
+      },  
+      "image_style": "none",  
+      "other_visual_notes": "stacked layout with links"  
+    }  
+  },  
+  "page_structure": [  
+    {"component": "top_navigation", "order": 1},  
+    {"component": "hero_banner", "order": 2},  
+    {"component": "intro_section", "order": 3},  
+    {"component": "service_highlights", "order": 4},  
+    {"component": "experience_section", "order": 5},  
+    {"component": "founder_section", "order": 6},  
+    {"component": "results_section", "order": 7},  
+    {"component": "partners_section", "order": 8},  
+    {"component": "testimonial_section", "order": 9},  
+    {"component": "exceptional_section", "order": 10},  
+    {"component": "advanced_applications", "order": 11},  
+    {"component": "social_cta", "order": 12},  
+    {"component": "footer", "order": 13}  
+  ]  
+}
+
+16- Url: [https://www.trivalleyplasticsurgery.com/](https://www.trivalleyplasticsurgery.com/)  
+Schema: {  
+  "components": {  
+    "top_navigation": {  
+      "type": "nav",  
+      "description": "Centered horizontal navigation bar with logo on left, menu items right-aligned. Transparent background over hero image.",  
+      "typography": {  
+        "menu_item": {  
+          "visual_description": "small uppercase sans-serif",  
+          "weight": "regular",  
+          "letter_spacing": "slight",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "small vertical, medium horizontal",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "transparent",  
+        "text": "white",  
+        "accent": "gold hover state"  
+      },  
+      "image_style": "flat logo",  
+      "other_visual_notes": "navigation appears over hero image"  
+    },  
+    "hero_banner": {  
+      "type": "hero",  
+      "description": "Full-width hero with large centered text and portrait of surgeon. Text aligned left, bold heading and subtitle.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "large sans-serif, white text",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "capitalize"  
+        },  
+        "body": {  
+          "visual_description": "medium white subtitle",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "extra large",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "photographic portrait",  
+        "text": "white",  
+        "accent": "gold button"  
+      },  
+      "image_style": "professional portrait background",  
+      "other_visual_notes": "overlay gradient for readability"  
+    },  
+    "intro_section": {  
+      "type": "section",  
+      "description": "Two-column text and supporting imagery introducing the practice.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "medium serif heading",  
+          "weight": "semi-bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "capitalize"  
+        },  
+        "body": {  
+          "visual_description": "small serif paragraph text",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large",  
+        "margin": "large vertical"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "black",  
+        "accent": "gold highlights"  
+      },  
+      "image_style": "rectangular images with shadows",  
+      "other_visual_notes": "staggered block arrangement"  
+    },  
+    "about_doctor_section": {  
+      "type": "section",  
+      "description": "Profile section with black-and-white portrait and right-aligned text block highlighting the surgeon.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "bold serif heading",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "capitalize"  
+        },  
+        "body": {  
+          "visual_description": "small serif body text",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large",  
+        "margin": "large vertical"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "black",  
+        "accent": "gold details"  
+      },  
+      "image_style": "black-and-white editorial portrait",  
+      "other_visual_notes": "clean white space with minimal lines"  
+    },  
+    "credentials_section": {  
+      "type": "section",  
+      "description": "Two-column section with text about credentials and a professional portrait of surgeon.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "medium bold serif heading",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "capitalize"  
+        },  
+        "body": {  
+          "visual_description": "regular serif text block",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large",  
+        "margin": "large vertical"  
+      },  
+      "colors": {  
+        "background": "light gray",  
+        "text": "black",  
+        "accent": "gold highlights"  
+      },  
+      "image_style": "formal portrait",  
+      "other_visual_notes": "alternating image and text placement"  
+    },  
+    "gallery_section": {  
+      "type": "section",  
+      "description": "Full-width banner promoting gallery with dark background and overlay text.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "large serif heading, white",  
+          "weight": "semi-bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "capitalize"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "extra large",  
+        "margin": "large vertical"  
+      },  
+      "colors": {  
+        "background": "black and white portrait background",  
+        "text": "white",  
+        "accent": "gold highlights"  
+      },  
+      "image_style": "darkened background photo",  
+      "other_visual_notes": "text overlay centered"  
+    },  
+    "testimonial_section": {  
+      "type": "section",  
+      "description": "Slider with customer testimonials, white background, black text.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "italic serif heading",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        },  
+        "body": {  
+          "visual_description": "small serif testimonial text",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large",  
+        "margin": "large vertical"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "black",  
+        "accent": "gold icons"  
+      },  
+      "image_style": "minimal use",  
+      "other_visual_notes": "carousel navigation dots"  
+    },  
+    "procedures_section": {  
+      "type": "section",  
+      "description": "Grid of procedure categories with photographic backgrounds and overlay text.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "bold uppercase text overlays, white",  
+          "weight": "bold",  
+          "letter_spacing": "spaced",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "medium",  
+        "margin": "large vertical"  
+      },  
+      "colors": {  
+        "background": "varies per photo",  
+        "text": "white",  
+        "accent": "gold hover states"  
+      },  
+      "image_style": "rectangular photography tiles",  
+      "other_visual_notes": "overlay hover effects"  
+    },  
+    "facility_section": {  
+      "type": "section",  
+      "description": "Two-column layout with text description and large photo of clinic interiors.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "medium serif heading",  
+          "weight": "semi-bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "capitalize"  
+        },  
+        "body": {  
+          "visual_description": "regular serif descriptive text",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large",  
+        "margin": "large vertical"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "black",  
+        "accent": "gold button"  
+      },  
+      "image_style": "interior photography",  
+      "other_visual_notes": "text aligned beside large photo"  
+    },  
+    "press_section": {  
+      "type": "section",  
+      "description": "Press mention block with quote on left and portrait of surgeon on right.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "italic serif quote text",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large",  
+        "margin": "large vertical"  
+      },  
+      "colors": {  
+        "background": "light gray",  
+        "text": "black",  
+        "accent": "gold highlights"  
+      },  
+      "image_style": "portrait on right side",  
+      "other_visual_notes": "split section design"  
+    },  
+    "cta_section": {  
+      "type": "cta",  
+      "description": "Full-width call-to-action with photographic background and centered text overlay.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "large serif heading, white",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "capitalize"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "extra large",  
+        "margin": "large vertical"  
+      },  
+      "colors": {  
+        "background": "photographic texture",  
+        "text": "white",  
+        "accent": "gold button"  
+      },  
+      "image_style": "close-up photography",  
+      "other_visual_notes": "overlay gradient for readability"  
+    },  
+    "footer": {  
+      "type": "footer",  
+      "description": "Dark footer with navigation links, logo, and contact details.",  
+      "typography": {  
+        "body": {  
+          "visual_description": "small uppercase sans-serif",  
+          "weight": "regular",  
+          "letter_spacing": "spaced",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "black",  
+        "text": "white",  
+        "accent": "gold highlights"  
+      },  
+      "image_style": "flat logo",  
+      "other_visual_notes": "multi-column layout for links"  
+    }  
+  },  
+  "page_structure": [  
+    {"component": "top_navigation", "order": 1},  
+    {"component": "hero_banner", "order": 2},  
+    {"component": "intro_section", "order": 3},  
+    {"component": "about_doctor_section", "order": 4},  
+    {"component": "credentials_section", "order": 5},  
+    {"component": "gallery_section", "order": 6},  
+    {"component": "testimonial_section", "order": 7},  
+    {"component": "procedures_section", "order": 8},  
+    {"component": "facility_section", "order": 9},  
+    {"component": "press_section", "order": 10},  
+    {"component": "cta_section", "order": 11},  
+    {"component": "footer", "order": 12}  
+  ]  
+}
+
+17- Url: [https://www.drmentz.com/](https://www.drmentz.com/)  
+Schema: {  
+  "components": {  
+    "top_navbar": {  
+      "type": "nav",  
+      "description": "Horizontal navigation bar with logo in center, links on left and right, and contact details on top right.",  
+      "typography": {  
+        "links": {  
+          "visual_description": "small uppercase serif font",  
+          "weight": "regular",  
+          "letter_spacing": "wide",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "small vertical, wide horizontal",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "dark charcoal",  
+        "accent": "gold"  
+      },  
+      "image_style": "logo centered",  
+      "other_visual_notes": "thin gold line separators"  
+    },  
+    "hero_banner": {  
+      "type": "hero",  
+      "description": "Full-width banner with dark overlay background, portrait image on right, bold serif headline text on left, and call-to-action button.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "large serif font, white",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        },  
+        "body": {  
+          "visual_description": "medium sans-serif, white",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "very large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "dark slate overlay",  
+        "text": "white",  
+        "accent": "gold"  
+      },  
+      "image_style": "large portrait photo",  
+      "other_visual_notes": "overlay fade effect"  
+    },  
+    "trust_banner": {  
+      "type": "text_block",  
+      "description": "Narrow centered section with white background and tagline text.",  
+      "typography": {  
+        "body": {  
+          "visual_description": "medium serif italic",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "medium vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "dark charcoal"  
+      },  
+      "image_style": "",  
+      "other_visual_notes": "center aligned text"  
+    },  
+    "awards_section": {  
+      "type": "grid",  
+      "description": "Row of award icons with centered heading above.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "medium serif, uppercase",  
+          "weight": "bold",  
+          "letter_spacing": "wide",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "off-white",  
+        "text": "dark charcoal"  
+      },  
+      "image_style": "icon grid, evenly spaced",  
+      "other_visual_notes": "five award badges in a row"  
+    },  
+    "intro_doctor": {  
+      "type": "card",  
+      "description": "Two-column layout with text on left and portrait photo on right.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "serif, uppercase",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "uppercase"  
+        },  
+        "body": {  
+          "visual_description": "sans-serif, medium gray",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "charcoal"  
+      },  
+      "image_style": "formal portrait, rectangular crop",  
+      "other_visual_notes": "left-right split layout"  
+    },  
+    "services_grid": {  
+      "type": "card_grid",  
+      "description": "Grid of service categories with image thumbnails and overlaid headings.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "uppercase serif white text",  
+          "weight": "bold",  
+          "letter_spacing": "wide",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "white",  
+        "accent": "gold"  
+      },  
+      "image_style": "rectangular images with hover overlay",  
+      "other_visual_notes": "3-column grid layout"  
+    },  
+    "testimonial_banner": {  
+      "type": "text_block",  
+      "description": "Wide centered testimonial text on dark blue background with quote marks.",  
+      "typography": {  
+        "body": {  
+          "visual_description": "large serif, white",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "very large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "navy blue",  
+        "text": "white"  
+      },  
+      "image_style": "",  
+      "other_visual_notes": "large quotation mark graphics"  
+    },  
+    "gallery_section": {  
+      "type": "gallery",  
+      "description": "Image gallery with grid of portraits, heading above.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "serif, uppercase",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "charcoal"  
+      },  
+      "image_style": "grid of portrait photos",  
+      "other_visual_notes": "clean gallery layout"  
+    },  
+    "footer": {  
+      "type": "footer",  
+      "description": "Dark footer with navigation links, contact info, and social icons.",  
+      "typography": {  
+        "body": {  
+          "visual_description": "small uppercase sans-serif",  
+          "weight": "regular",  
+          "letter_spacing": "spaced",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "dark charcoal",  
+        "text": "white",  
+        "accent": "gold highlights"  
+      },  
+      "image_style": "social icons",  
+      "other_visual_notes": "multi-column layout"  
+    }  
+  },  
+  "page_structure": [  
+    {"component": "top_navbar", "order": 1},  
+    {"component": "hero_banner", "order": 2},  
+    {"component": "trust_banner", "order": 3},  
+    {"component": "awards_section", "order": 4},  
+    {"component": "intro_doctor", "order": 5},  
+    {"component": "services_grid", "order": 6},  
+    {"component": "testimonial_banner", "order": 7},  
+    {"component": "gallery_section", "order": 8},  
+    {"component": "footer", "order": 9}  
+  ]  
+}
+
+18- Url: [https://agelessaesthetics.com/](https://agelessaesthetics.com/)  
+Schema: {  
+  "components": {  
+    "top_navbar": {  
+      "type": "nav",  
+      "description": "Horizontal navigation bar with logo in center, links on left and right, and contact details above on right.",  
+      "typography": {  
+        "links": {  
+          "visual_description": "small uppercase serif font",  
+          "weight": "regular",  
+          "letter_spacing": "wide",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "small vertical, medium horizontal",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "dark charcoal",  
+        "accent": "gold"  
+      },  
+      "image_style": "logo centered",  
+      "other_visual_notes": "thin gold line separators"  
+    },  
+    "hero_banner": {  
+      "type": "hero",  
+      "description": "Full-width background image with soft gradient overlay, large serif headline, and centered gold button.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "extra large serif, white",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "uppercase"  
+        },  
+        "body": {  
+          "visual_description": "medium sans-serif, white",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "very large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "dark gradient over photo",  
+        "text": "white",  
+        "accent": "gold"  
+      },  
+      "image_style": "full-width background image",  
+      "other_visual_notes": "soft vignette effect"  
+    },  
+    "awards_strip": {  
+      "type": "grid",  
+      "description": "Horizontal strip of award logos on white background.",  
+      "typography": {},  
+      "spacing": {  
+        "padding": "medium vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "none"  
+      },  
+      "image_style": "small logos in a row",  
+      "other_visual_notes": "equally spaced"  
+    },  
+    "intro_text_block": {  
+      "type": "text_block",  
+      "description": "Centered heading with supporting paragraph.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "serif, medium-large, black",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        },  
+        "body": {  
+          "visual_description": "sans-serif, medium gray",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "charcoal"  
+      },  
+      "image_style": "",  
+      "other_visual_notes": "center aligned"  
+    },  
+    "service_cards": {  
+      "type": "card_grid",  
+      "description": "Row of portrait images with category text overlay at bottom.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "uppercase serif white text",  
+          "weight": "bold",  
+          "letter_spacing": "wide",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "white",  
+        "accent": "gold"  
+      },  
+      "image_style": "portrait rectangular images",  
+      "other_visual_notes": "even spacing between cards"  
+    },  
+    "team_section": {  
+      "type": "image_with_text",  
+      "description": "Group photo of team with heading and description above.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "serif, black, medium-large",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "charcoal"  
+      },  
+      "image_style": "large team group photo",  
+      "other_visual_notes": "center aligned"  
+    },  
+    "doctor_intro": {  
+      "type": "split_section",  
+      "description": "Two-column layout with text on left and portrait photo on right.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "serif, uppercase, black",  
+          "weight": "bold",  
+          "letter_spacing": "wide",  
+          "text_transform": "uppercase"  
+        },  
+        "body": {  
+          "visual_description": "sans-serif, gray",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "charcoal"  
+      },  
+      "image_style": "portrait rectangular photo",  
+      "other_visual_notes": "left-right split"  
+    },  
+    "quality_banner": {  
+      "type": "text_block",  
+      "description": "Full-width background with dark textured overlay and centered serif text in white and gold.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "large serif white",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        },  
+        "accent": {  
+          "visual_description": "serif italic gold",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "very large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "dark marble texture",  
+        "text": "white",  
+        "accent": "gold"  
+      },  
+      "image_style": "background texture",  
+      "other_visual_notes": "center aligned"  
+    },  
+    "testimonial_section": {  
+      "type": "testimonial",  
+      "description": "Centered testimonial text with large quotation marks.",  
+      "typography": {  
+        "body": {  
+          "visual_description": "serif, italic, black",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        },  
+        "author": {  
+          "visual_description": "sans-serif, uppercase, gray",  
+          "weight": "regular",  
+          "letter_spacing": "wide",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "charcoal"  
+      },  
+      "image_style": "",  
+      "other_visual_notes": "center aligned quote"  
+    },  
+    "promo_banner": {  
+      "type": "hero",  
+      "description": "Full-width section with background image, gold accent text, and call-to-action button.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "serif, white",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "dark interior photo",  
+        "text": "white",  
+        "accent": "gold"  
+      },  
+      "image_style": "background photo",  
+      "other_visual_notes": "dark overlay"  
+    },  
+    "footer_form": {  
+      "type": "footer",  
+      "description": "Footer with textured dark background, contact form, contact details, and logo.",  
+      "typography": {  
+        "links": {  
+          "visual_description": "small sans-serif uppercase white",  
+          "weight": "regular",  
+          "letter_spacing": "wide",  
+          "text_transform": "uppercase"  
+        },  
+        "body": {  
+          "visual_description": "small sans-serif gray",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "dark marble texture",  
+        "text": "white",  
+        "accent": "gold"  
+      },  
+      "image_style": "logo in white",  
+      "other_visual_notes": "multi-column footer layout"  
+    }  
+  },  
+  "page_structure": [  
+    {"component": "top_navbar", "order": 1},  
+    {"component": "hero_banner", "order": 2},  
+    {"component": "awards_strip", "order": 3},  
+    {"component": "intro_text_block", "order": 4},  
+    {"component": "service_cards", "order": 5},  
+    {"component": "team_section", "order": 6},  
+    {"component": "doctor_intro", "order": 7},  
+    {"component": "quality_banner", "order": 8},  
+    {"component": "testimonial_section", "order": 9},  
+    {"component": "promo_banner", "order": 10},  
+    {"component": "footer_form", "order": 11}  
+  ]  
+}  
+
+19- Url: [https://newskin.com/](https://newskin.com/)  
+Schema: {  
+  "components": {  
+    "top_navbar": {  
+      "type": "nav",  
+      "description": "Slim horizontal navigation with logo centered, links spread evenly, and contact details on top.",  
+      "typography": {  
+        "links": {  
+          "visual_description": "small uppercase sans-serif",  
+          "weight": "regular",  
+          "letter_spacing": "wide",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "small vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "black",  
+        "accent": "warm beige"  
+      },  
+      "image_style": "minimal logo",  
+      "other_visual_notes": "subtle underline hover effect on links"  
+    },  
+    "hero_banner": {  
+      "type": "hero",  
+      "description": "Full-width split background image featuring close-up portrait photography with overlay text and CTA button.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "extra large serif, white",  
+          "weight": "light",  
+          "letter_spacing": "normal",  
+          "text_transform": "uppercase"  
+        },  
+        "body": {  
+          "visual_description": "small sans-serif white",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "very large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "photo background",  
+        "text": "white",  
+        "accent": "beige"  
+      },  
+      "image_style": "large portrait photography split into two halves",  
+      "other_visual_notes": "text and button aligned bottom center"  
+    },  
+    "intro_section": {  
+      "type": "split_section",  
+      "description": "Two-column layout with photo on right and text on left introducing the practice.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "serif, medium-large black",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        },  
+        "body": {  
+          "visual_description": "sans-serif medium gray",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "light cream",  
+        "text": "charcoal"  
+      },  
+      "image_style": "rectangular portrait photo",  
+      "other_visual_notes": "rounded image corners"  
+    },  
+    "services_highlight": {  
+      "type": "card_grid",  
+      "description": "Three-column service highlight with icon/image above text.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "serif, uppercase, black",  
+          "weight": "bold",  
+          "letter_spacing": "wide",  
+          "text_transform": "uppercase"  
+        },  
+        "body": {  
+          "visual_description": "sans-serif, gray",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "charcoal",  
+        "accent": "beige"  
+      },  
+      "image_style": "square service icons/photos",  
+      "other_visual_notes": "even 3-column layout"  
+    },  
+    "testimonial_slider": {  
+      "type": "testimonial",  
+      "description": "Carousel of client reviews with centered star icons and text.",  
+      "typography": {  
+        "body": {  
+          "visual_description": "serif italic black",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        },  
+        "author": {  
+          "visual_description": "sans-serif uppercase gray",  
+          "weight": "regular",  
+          "letter_spacing": "wide",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "light cream",  
+        "text": "charcoal"  
+      },  
+      "image_style": "",  
+      "other_visual_notes": "slider navigation dots"  
+    },  
+    "cta_banner": {  
+      "type": "hero",  
+      "description": "Full-width banner with background image, centered serif text, and CTA button.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "serif, white large",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "very large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "dark overlay photo",  
+        "text": "white",  
+        "accent": "beige"  
+      },  
+      "image_style": "full-bleed background photo",  
+      "other_visual_notes": "soft overlay fade"  
+    },  
+    "staff_section": {  
+      "type": "image_with_text",  
+      "description": "Two-column section featuring staff group photo and descriptive text.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "serif, uppercase black",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "charcoal"  
+      },  
+      "image_style": "group staff photo",  
+      "other_visual_notes": "text in white box background"  
+    },  
+    "procedures_grid": {  
+      "type": "card_grid",  
+      "description": "Grid of procedures with square or rectangular photo thumbnails and overlaid text.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "serif, uppercase white",  
+          "weight": "bold",  
+          "letter_spacing": "wide",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "white",  
+        "accent": "beige"  
+      },  
+      "image_style": "rectangular thumbnails",  
+      "other_visual_notes": "multi-column layout with hover effects"  
+    },  
+    "clinic_section": {  
+      "type": "gallery",  
+      "description": "Photo gallery of clinic interiors with grid layout.",  
+      "typography": {},  
+      "spacing": {  
+        "padding": "large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "light cream",  
+        "text": "charcoal"  
+      },  
+      "image_style": "rectangular interior photography",  
+      "other_visual_notes": "even spacing between images"  
+    },  
+    "consultation_cta": {  
+      "type": "split_section",  
+      "description": "Two-column section with portrait on left, CTA text and button on right.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "serif, uppercase white",  
+          "weight": "bold",  
+          "letter_spacing": "normal",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "dark gray",  
+        "text": "white",  
+        "accent": "beige"  
+      },  
+      "image_style": "large portrait photo",  
+      "other_visual_notes": "dark background contrasts with light text"  
+    },  
+    "footer": {  
+      "type": "footer",  
+      "description": "Dark footer with logo centered, contact details, social icons, and navigation links.",  
+      "typography": {  
+        "links": {  
+          "visual_description": "small uppercase sans-serif, white",  
+          "weight": "regular",  
+          "letter_spacing": "wide",  
+          "text_transform": "uppercase"  
+        },  
+        "body": {  
+          "visual_description": "small sans-serif gray",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "charcoal black",  
+        "text": "white",  
+        "accent": "beige"  
+      },  
+      "image_style": "white logo on dark background",  
+      "other_visual_notes": "multi-column layout with center alignment"  
+    }  
+  },  
+  "page_structure": [  
+    {"component": "top_navbar", "order": 1},  
+    {"component": "hero_banner", "order": 2},  
+    {"component": "intro_section", "order": 3},  
+    {"component": "services_highlight", "order": 4},  
+    {"component": "testimonial_slider", "order": 5},  
+    {"component": "cta_banner", "order": 6},  
+    {"component": "staff_section", "order": 7},  
+    {"component": "procedures_grid", "order": 8},  
+    {"component": "clinic_section", "order": 9},  
+    {"component": "consultation_cta", "order": 10},  
+    {"component": "footer", "order": 11}  
+  ]  
+}  
+
+20- Url: [https://hannahlondon.com/](https://hannahlondon.com/)  
+Schema: {  
+  "components": {  
+    "navigation_bar": {  
+      "type": "nav",  
+      "description": "Horizontal navigation bar with logo on left, links in center, and a call-to-action button on right.",  
+      "typography": {  
+        "links": {  
+          "visual_description": "small uppercase serif text",  
+          "weight": "light",  
+          "letter_spacing": "spaced",  
+          "text_transform": "uppercase"  
+        },  
+        "button": {  
+          "visual_description": "small sans-serif text inside rounded button",  
+          "weight": "medium",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "medium vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "dark grey",  
+        "accent": "soft teal button"  
+      },  
+      "image_style": "simple wordmark logo left aligned",  
+      "other_visual_notes": "links evenly spaced, transparent background with subtle shadow"  
+    },  
+    "hero_banner": {  
+      "type": "hero",  
+      "description": "Large background image with centered logo and subtle overlay.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "large serif all-caps logo text",  
+          "weight": "regular",  
+          "letter_spacing": "wide",  
+          "text_transform": "uppercase"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "extra large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "soft image overlay in muted grey",  
+        "text": "white"  
+      },  
+      "image_style": "full-width background image with transparent overlay",  
+      "other_visual_notes": "hero image blends softly behind content"  
+    },  
+    "testimonial_intro": {  
+      "type": "text_block",  
+      "description": "Introductory text block with testimonial and portrait photo of doctor.",  
+      "typography": {  
+        "body": {  
+          "visual_description": "regular serif body text, left aligned",  
+          "weight": "light",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large box padding",  
+        "margin": "large vertical spacing"  
+      },  
+      "colors": {  
+        "background": "light grey box",  
+        "text": "dark grey"  
+      },  
+      "image_style": "photo of person on right side",  
+      "other_visual_notes": "quote-style formatting, signature at bottom"  
+    },  
+    "callback_form": {  
+      "type": "form",  
+      "description": "Small call-back request form with image on left, text fields on right.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "small serif heading text",  
+          "weight": "medium",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        },  
+        "input_labels": {  
+          "visual_description": "small sans-serif text",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "medium inside fields",  
+        "margin": "large vertical"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "dark grey",  
+        "accent": "soft teal button"  
+      },  
+      "image_style": "building photo on left side",  
+      "other_visual_notes": "form has subtle divider lines"  
+    },  
+    "treatment_grid": {  
+      "type": "card_grid",  
+      "description": "Three-column grid of treatment cards with images and overlay text.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "overlay serif text on images",  
+          "weight": "light",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        },  
+        "body": {  
+          "visual_description": "small caption sans-serif text",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "small inside cards",  
+        "margin": "large vertical spacing"  
+      },  
+      "colors": {  
+        "background": "white",  
+        "text": "dark grey",  
+        "accent": "light green overlay on hover"  
+      },  
+      "image_style": "black-and-white photos with overlay text",  
+      "other_visual_notes": "grid is evenly spaced with subtle rounded corners"  
+    },  
+    "gp_services_section": {  
+      "type": "text_block",  
+      "description": "Two-column grid with bulleted GP services list in soft green background box.",  
+      "typography": {  
+        "heading": {  
+          "visual_description": "serif subheading centered",  
+          "weight": "medium",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        },  
+        "body": {  
+          "visual_description": "small sans-serif bulleted text",  
+          "weight": "regular",  
+          "letter_spacing": "normal",  
+          "text_transform": "none"  
+        }  
+      },  
+      "spacing": {  
+        "padding": "large vertical",  
+        "margin": "none"  
+      },  
+      "colors": {  
+        "background": "soft green box",  
+        "text": "dark grey"  
+      },  
+      "image_style": "",  
+      "other_visual_notes": "two-column layout with bullet points"  
+    }  
+  },  
+  "page_structure": [  
+    {"component": "navigation_bar", "order": 1},  
+    {"component": "hero_banner", "order": 2},  
+    {"component": "testimonial_intro", "order": 3},  
+    {"component": "callback_form", "order": 4},  
+    {"component": "treatment_grid", "order": 5},  
+    {"component": "gp_services_section", "order": 6}  
+  ]  
+}
