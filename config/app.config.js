@@ -2,7 +2,7 @@
 
 export const appConfig = {
   e2b: {
-    timeoutMinutes: 15,
+    timeoutMinutes: 30,
     get timeoutMs() {
       return this.timeoutMinutes * 60 * 1000;
     },

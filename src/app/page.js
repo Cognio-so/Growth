@@ -125,6 +125,8 @@ function AISandboxPageContent() {
   const [documentDesignPrompt, setDocumentDesignPrompt] = useState('');
   const [showExtractedDataReview, setShowExtractedDataReview] = useState(false);
   const [editableExtractedInfo, setEditableExtractedInfo] = useState(null);
+  const [iframeRefreshKey, setIframeRefreshKey] = useState(0);
+  const [lastDesignUpdate, setLastDesignUpdate] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -448,9 +450,12 @@ Tip: I automatically detect and install npm packages from your code imports (lik
     }
   };
 
-  const applyGeneratedCode = async (code, isEdit = false) => {
+  const applyGeneratedCode = async (code, isEdit = false, isRedesign = false) => {
     setLoadingStage('applying');
     log('Applying AI-generated code...');
+    if (isRedesign) {
+      console.log('[applyGeneratedCode] *** REDESIGN MODE - Files will be cleared ***');
+    }
 
     try {
       setCodeApplicationState({ stage: 'analyzing' });
@@ -467,6 +472,7 @@ Tip: I automatically detect and install npm packages from your code imports (lik
         body: JSON.stringify({
           response: code,
           isEdit: isEdit,
+          isRedesign: isRedesign,
           packages: pendingPackages,
           sandboxId: sandboxData?.sandboxId // Pass the sandbox ID to ensure proper connection
         })
@@ -1335,19 +1341,109 @@ Tip: I automatically detect and install npm packages from your code imports (lik
 
   const renderPreviewContent = () => {
     // Show screenshot with progress overlay when scraping
-    if (urlScreenshot && (loading || generationProgress.isGenerating || !sandboxData?.url || isPreparingDesign)) {
+    if (isCapturingScreenshot) {
       return (
-        <div className="relative w-full h-full bg-gray-100">
-          <img
-            src={urlScreenshot}
-            alt="Website preview"
-            className="w-full h-full object-contain"
-          />
-          {(generationProgress.isGenerating || isPreparingDesign || loadingStage) && (
-            <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
-              <div className="bg-black/90 rounded-xl p-8 backdrop-blur-sm border border-gray-700">
-                <ProgressStages currentStage={loadingStage || 'scraping'} />
+        <div className="relative w-full h-full bg-gray-900 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p className="text-gray-300">Capturing screenshot...</p>
               </div>
+        </div>
+      );
+    }
+
+    // Show sandbox iframe when ready
+    if (sandboxData?.url && !loading) {
+      // Enhanced cache-busting logic
+      const isRedesignComplete = generationProgress.status === 'Redesign complete!';
+      const isRegenerateComplete = generationProgress.status === 'Regeneration complete!';
+      const isNewDesign = isRedesignComplete || isRegenerateComplete;
+      
+      // Create a unique key that changes when design is updated
+      const designUpdateKey = isNewDesign ? `design-${Date.now()}` : 'normal';
+      
+      // Enhanced cache-busting parameters
+      const cacheParams = new URLSearchParams({
+        t: Date.now().toString(),
+        v: iframeRefreshKey.toString(),
+        design: isNewDesign ? 'updated' : 'normal'
+      });
+      
+      if (isNewDesign) {
+        cacheParams.append('update', Date.now().toString());
+        cacheParams.append('cache', 'bust');
+        cacheParams.append('force', 'refresh');
+        cacheParams.append('bust', 'true');
+      }
+      
+      const iframeSrc = `${sandboxData.url}?${cacheParams.toString()}`;
+      
+      return (
+        <div className="relative w-full h-full">
+          <iframe
+            key={`${designUpdateKey}-${iframeRefreshKey}`}
+            ref={iframeRef}
+            src={iframeSrc}
+            className="w-full h-full border-none"
+            title="Design Assistant Sandbox"
+            allow="clipboard-write"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+            onLoad={() => {
+              if (isNewDesign) {
+                console.log('[Iframe Loaded] New design iframe loaded successfully');
+                setLastDesignUpdate(Date.now());
+              }
+            }}
+          />
+          
+          {/* Enhanced Refresh button with design update indicator */}
+          <button
+            onClick={() => {
+              if (iframeRef.current && sandboxData?.url) {
+                console.log('[Manual Refresh] Forcing iframe reload with enhanced cache busting...');
+                
+                // Force a complete refresh by updating the refresh key
+                setIframeRefreshKey(prev => prev + 1);
+                
+                // Also update the iframe src directly with comprehensive cache busting
+                const manualCacheParams = new URLSearchParams({
+                  t: Date.now().toString(),
+                  v: (iframeRefreshKey + 1).toString(),
+                  manual: 'true',
+                  cache: Date.now().toString(),
+                  force: 'refresh',
+                  bust: 'true',
+                  update: Date.now().toString()
+                });
+                
+                const newSrc = `${sandboxData.url}?${manualCacheParams.toString()}`;
+                iframeRef.current.src = newSrc;
+                console.log('[Manual Refresh] Iframe refreshed with:', newSrc);
+              }
+            }}
+            className={`absolute bottom-4 right-4 p-3 rounded-xl shadow-lg transition-all duration-200 hover:scale-105 ${
+              isNewDesign 
+                ? 'bg-green-500/90 hover:bg-green-500 text-white' 
+                : 'bg-white/90 hover:bg-white text-gray-700'
+            }`}
+            title={isNewDesign ? "New design ready - Refresh to see updated design" : "Refresh sandbox"}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+          
+          {/* Enhanced design update indicator */}
+          {isNewDesign && (
+            <div className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium animate-pulse">
+              ✨ New Design Ready
+            </div>
+          )}
+          
+          {/* Additional cache status indicator */}
+          {lastDesignUpdate && (
+            <div className="absolute top-4 left-4 bg-blue-500/80 text-white px-2 py-1 rounded text-xs">
+              Last Update: {new Date(lastDesignUpdate).toLocaleTimeString()}
             </div>
           )}
         </div>
@@ -1359,38 +1455,6 @@ Tip: I automatically detect and install npm packages from your code imports (lik
       return (
         <div className="relative w-full h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
           <ProgressStages currentStage={loadingStage || 'generating'} />
-        </div>
-      );
-    }
-
-    // Show sandbox iframe when ready
-    if (sandboxData?.url && !loading) {
-      return (
-        <div className="relative w-full h-full">
-          <iframe
-            ref={iframeRef}
-            src={sandboxData.url}
-            className="w-full h-full border-none"
-            title="Design Assistant Sandbox"
-            allow="clipboard-write"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
-          />
-          {/* Refresh button */}
-          <button
-            onClick={() => {
-              if (iframeRef.current && sandboxData?.url) {
-                console.log('[Manual Refresh] Forcing iframe reload...');
-                const newSrc = `${sandboxData.url}?t=${Date.now()}&manual=true`;
-                iframeRef.current.src = newSrc;
-              }
-            }}
-            className="absolute bottom-4 right-4 bg-white/90 hover:bg-white text-gray-700 p-3 rounded-xl shadow-lg transition-all duration-200 hover:scale-105"
-            title="Refresh sandbox"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </button>
         </div>
       );
     }
@@ -1579,7 +1643,7 @@ Please create a complete React application following the UI/UX design principles
                       status: 'Generating code...'
                     };
 
-                    const fileRegex = /<file path="([^"]+)">([^]*?)<\/file>/g;
+                    const fileRegex = /<file path="([^"]+)">([\s\S]*?)<\/file>/g;
                     let match;
                     const processedFiles = new Set(prev.files.map(f => f.path));
 
@@ -1625,7 +1689,7 @@ Please create a complete React application following the UI/UX design principles
                       }
                     }
 
-                    const lastFileMatch = newStreamedCode.match(/<file path="([^"]+)">([^]*?)$/);
+                    const lastFileMatch = newStreamedCode.match(/<file path="([^"]+)">([\s\S]*?)$/);
                     if (lastFileMatch && !lastFileMatch[0].includes('</file>')) {
                       const filePath = lastFileMatch[1];
                       const partialContent = lastFileMatch[2];
@@ -1694,7 +1758,7 @@ Please create a complete React application following the UI/UX design principles
                     (window).pendingPackages = data.packagesToInstall;
                   }
 
-                  const fileRegex = /<file path="([^"]+)">([^]*?)<\/file>/g;
+                  const fileRegex = /<file path="([^"]+)">([\s\S]*?)<\/file>/g;
                   const parsedFiles = [];
                   let fileMatch;
 
@@ -1735,7 +1799,7 @@ Please create a complete React application following the UI/UX design principles
       }
 
       if (generatedCode) {
-        const fileRegex = /<file path="([^"]+)">([^]*?)<\/file>/g;
+        const fileRegex = /<file path="([^"]+)">([\s\S]*?)<\/file>/g;
         const generatedFiles = [];
         let match;
         while ((match = fileRegex.exec(generatedCode)) !== null) {
@@ -2120,7 +2184,7 @@ Focus on the key sections and content, making it clean and modern while preservi
                       status: 'Generating code...'
                     };
 
-                    const fileRegex = /<file path="([^"]+)">([^]*?)<\/file>/g;
+                    const fileRegex = /<file path="([^"]+)">([\s\S]*?)<\/file>/g;
                     let match;
                     const processedFiles = new Set(prev.files.map(f => f.path));
 
@@ -2166,7 +2230,7 @@ Focus on the key sections and content, making it clean and modern while preservi
                       }
                     }
 
-                    const lastFileMatch = newStreamedCode.match(/<file path="([^"]+)">([^]*?)$/);
+                    const lastFileMatch = newStreamedCode.match(/<file path="([^"]+)">([\s\S]*?)$/);
                     if (lastFileMatch && !lastFileMatch[0].includes('</file>')) {
                       const filePath = lastFileMatch[1];
                       const partialContent = lastFileMatch[2];
@@ -2235,7 +2299,7 @@ Focus on the key sections and content, making it clean and modern while preservi
                     (window).pendingPackages = data.packagesToInstall;
                   }
 
-                  const fileRegex = /<file path="([^"]+)">([^]*?)<\/file>/g;
+                  const fileRegex = /<file path="([^"]+)">([\s\S]*?)<\/file>/g;
                   const parsedFiles = [];
                   let fileMatch;
 
@@ -2460,7 +2524,7 @@ Focus on the key sections and content, making it clean and modern while preservi
           setTimeout(() => {
             setLoadingStage('generating');
             setActiveTab('generation');
-          }, 1500);
+          }, 2000);
 
           setConversationContext(prev => ({
             ...prev,
@@ -2582,7 +2646,7 @@ Focus on the key sections and content, making it clean and modern.`;
                         status: 'Generating code...'
                       };
 
-                      const fileRegex = /<file path="([^"]+)">([^]*?)<\/file>/g;
+                      const fileRegex = /<file path="([^"]+)">([\s\S]*?)<\/file>/g;
                       let match;
                       const processedFiles = new Set(prev.files.map(f => f.path));
 
@@ -2628,7 +2692,7 @@ Focus on the key sections and content, making it clean and modern.`;
                         }
                       }
 
-                      const lastFileMatch = newStreamedCode.match(/<file path="([^"]+)">([^]*?)$/);
+                      const lastFileMatch = newStreamedCode.match(/<file path="([^"]+)">([\s\S]*?)$/);
                       if (lastFileMatch && !lastFileMatch[0].includes('</file>')) {
                         const filePath = lastFileMatch[1];
                         const partialContent = lastFileMatch[2];
@@ -2877,7 +2941,7 @@ Focus on creating a beautiful, functional website based on the description.`;
                         status: 'Generating code...'
                       };
 
-                      const fileRegex = /<file path="([^"]+)">([^]*?)<\/file>/g;
+                      const fileRegex = /<file path="([^"]+)">([\s\S]*?)<\/file>/g;
                       let match;
                       const processedFiles = new Set(prev.files.map(f => f.path));
 
@@ -2923,7 +2987,7 @@ Focus on creating a beautiful, functional website based on the description.`;
                         }
                       }
 
-                      const lastFileMatch = newStreamedCode.match(/<file path="([^"]+)">([^]*?)$/);
+                      const lastFileMatch = newStreamedCode.match(/<file path="([^"]+)">([\s\S]*?)$/);
                       if (lastFileMatch && !lastFileMatch[0].includes('</file>')) {
                         const filePath = lastFileMatch[1];
                         const partialContent = lastFileMatch[2];
@@ -3185,7 +3249,7 @@ I'll now generate a website based on these requirements and our UI design princi
                       status: 'Generating code...'
                     };
 
-                    const fileRegex = /<file path="([^"]+)">([^]*?)<\/file>/g;
+                    const fileRegex = /<file path="([^"]+)">([\s\S]*?)<\/file>/g;
                     let match;
                     const processedFiles = new Set(prev.files.map(f => f.path));
 
@@ -3231,7 +3295,7 @@ I'll now generate a website based on these requirements and our UI design princi
                       }
                     }
 
-                    const lastFileMatch = newStreamedCode.match(/<file path="([^"]+)">([^]*?)$/);
+                    const lastFileMatch = newStreamedCode.match(/<file path="([^"]+)">([\s\S]*?)$/);
                     if (lastFileMatch && !lastFileMatch[0].includes('</file>')) {
                       const filePath = lastFileMatch[1];
                       const partialContent = lastFileMatch[2];
@@ -3394,254 +3458,361 @@ Focus on creating a website that embodies the business's brand identity and effe
   // testCsvParsing();
 
   // Add the redesign function after the existing functions
-  const handleRedesign = async () => {
-    if (!sandboxData) {
-      addChatMessage('No active sandbox. Create a sandbox first!', 'system');
-      return;
-    }
+ // Add the redesign function after the existing functions
+// In page.js, update the handleRedesign function to clear files BEFORE calling AI:
 
+const handleRedesign = async () => {
+  if (!sandboxData) {
+    addChatMessage('No active sandbox. Create a sandbox first!', 'system');
+    return;
+  }
+
+  // Reset generation progress state
+  setGenerationProgress({
+    isGenerating: true,
+    status: 'Preparing for complete redesign...',
+    components: [],
+    currentComponent: 0,
+    streamedCode: '',
+    isStreaming: false,
+    isThinking: false,
+    thinkingText: '',
+    thinkingDuration: 0,
+    files: [], // Reset files array
+    currentFile: undefined,
+    lastProcessedPosition: 0,
+    isEdit: false
+  });
+
+  setActiveTab('generation');
+
+  try {
+    // Step 1: Clear files BEFORE AI generation
+    addChatMessage('Clearing existing files for complete redesign...', 'system');
+    
     setGenerationProgress(prev => ({
-      isGenerating: true,
-      status: 'Analyzing request and selecting different design schema...',
-      components: [],
-      currentComponent: 0,
-      streamedCode: '',
-      isStreaming: true,
-      isThinking: false,
-      thinkingText: undefined,
-      thinkingDuration: undefined,
-      files: prev.files || [],
-      currentFile: undefined,
-      lastProcessedPosition: 0
+      ...prev,
+      status: 'Clearing existing files...'
     }));
 
-    setActiveTab('generation');
+    const clearResponse = await fetch('/api/clear-sandbox-files', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sandboxId: sandboxData.sandboxId,
+        isRedesign: true
+      })
+    });
 
-    try {
-      // Enhanced redesign prompt with stronger instructions for complete UI/UX restructuring
-      const redesignPrompt = `🚨 COMPLETE REBUILD & REPLACE: Recreate this website from scratch with a new design, new content, and new functionality.
+    if (!clearResponse.ok) {
+      throw new Error('Failed to clear sandbox files');
+    }
 
-**CRITICAL INSTRUCTIONS - OVERRIDE ALL PREVIOUS CONTEXT:**
-1.  **DELETE & REPLACE:** Your first action is to completely remove/delete all existing files.
-2.  **SELECT A DESIGN SCHEMA:** Choose a random design schema from the CSV file to define the new visual style.
-3.  **REBUILD FROM SCRATCH:** Generate entirely new files from a blank slate.
-4.  **REPLACE ALL VISUALS:** Using the new schema, create a new visual identity—colors, typography, spacing, layout, and components.
-5.  **REPLACE ALL CONTENT & FUNCTIONALITY:** Discard all original text and features. Generate new, relevant placeholder content and introduce improved functionalities appropriate for the new design.
-6.  **ENSURE RESPONSIVENESS:** The new build must be modern and fully responsive.
+    const clearResult = await clearResponse.json();
+    if (clearResult.success) {
+      addChatMessage(`Successfully cleared ${clearResult.filesDeleted || 0} files`, 'system');
+      setGenerationProgress(prev => ({
+        ...prev,
+        status: 'Files cleared, starting AI generation...'
+      }));
+    }
 
-**EXECUTION WORKFLOW - FULL-SCOPE REIMAGINATION:**
-- **FILE OPERATION:** Discard all old code and files entirely. Start fresh.
-- **NEW SCHEMA ANALYSIS:** Thoroughly analyze the chosen schema to build the new design system.
-- **REBUILD ALL COMPONENTS:** Recreate the Header, Hero, body sections, and Footer with new layouts and features.
-- **GENERATE NEW CONTENT:** Populate the new components with relevant, high-quality placeholder text and images.
-- **IMPLEMENT NEW STYLES:** Apply the new schema's colors, typography, and spacing rules consistently.
-- **GENERATE NEW, COMPLETE FILE(S):** Output the full code for the brand-new website.
+    // Step 2: Generate new code with AI
+    const redesignPrompt = `🚨 COMPLETE REBUILD & REPLACE: Recreate this website from scratch with a new design, new content, and new functionality.
 
-**MANDATORY:** This is a "tear-down and rebuild" operation. Nothing from the original implementation—visuals, content, or functionality—should be preserved. Create a completely new product.`;
+**CRITICAL INSTRUCTIONS - THE SANDBOX IS NOW EMPTY:**
+1. All existing files have been DELETED from the sandbox
+2. You must create EVERY file from scratch
+3. Generate a completely NEW website design using intelligent schema selection
+4. Create ALL necessary files (App.jsx, main.jsx, components, etc.)
+5. This is a complete rebuild - not an edit or modification
 
-      const response = await fetch('/api/generate-ai-code-stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: redesignPrompt,
-          model: aiModel,
-          context: {
-            sandboxId: sandboxData?.sandboxId,
-            structure: structureContent,
-            conversationContext: conversationContext,
-            currentFiles: sandboxFiles
-          },
-          isEdit: false, // Changed from true to false - this prevents the system from providing existing files and preservation instructions
-          url: null // Ensure we use intelligent CSV schema selection
-        })
-      });
+**MANDATORY FILES TO CREATE:**
+- src/App.jsx (main application)
+- src/main.jsx (entry point) 
+- src/index.css (styles)
+- src/components/* (all UI components)
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+Create a beautiful, modern website with a completely new design.`;
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let generatedCode = '';
-      let explanation = '';
+    setGenerationProgress(prev => ({
+      ...prev,
+      status: 'Initializing AI generation...',
+      isThinking: true,
+      thinkingText: 'Analyzing redesign requirements...'
+    }));
 
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+    const response = await fetch('/api/generate-ai-code-stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: redesignPrompt,
+        model: aiModel,
+        context: {
+          sandboxId: sandboxData?.sandboxId,
+          structure: '', // Empty since we cleared everything
+          conversationContext: conversationContext,
+          currentFiles: {} // Empty - no files exist now
+        },
+        isEdit: false,
+        url: null
+      })
+    });
 
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
+    // Step 3: Handle streaming response and update UI state
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+    let generatedCode = '';
+    let explanation = '';
 
-                if (data.type === 'status') {
-                  setGenerationProgress(prev => ({ ...prev, status: data.message }));
-                } else if (data.type === 'thinking') {
-                  setGenerationProgress(prev => ({
-                    ...prev,
-                    isThinking: true,
-                    thinkingText: (prev.thinkingText || '') + data.text
-                  }));
-                } else if (data.type === 'thinking_complete') {
-                  setGenerationProgress(prev => ({
-                    ...prev,
-                    isThinking: false,
-                    thinkingDuration: data.duration
-                  }));
-                } else if (data.type === 'conversation') {
-                  let text = data.text || '';
+    if (reader) {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-                  text = text.replace(/<package>[^<]*<\/package>/g, '');
-                  text = text.replace(/<packages>[^<]*<\/packages>/g, '');
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
 
-                  if (!text.includes('<file') && !text.includes('import React') &&
-                    !text.includes('export default') && !text.includes('className=') &&
-                    text.trim().length > 0) {
-                    addChatMessage(text.trim(), 'ai');
-                  }
-                } else if (data.type === 'stream' && data.raw) {
-                  setGenerationProgress(prev => {
-                    const newStreamedCode = prev.streamedCode + data.text;
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
 
-                    const updatedState = {
-                      ...prev,
-                      streamedCode: newStreamedCode,
-                      isStreaming: true,
-                      isThinking: false,
-                      status: 'Redesigning with intelligent schema...'
-                    };
+              if (data.type === 'status') {
+                setGenerationProgress(prev => ({ ...prev, status: data.message }));
+              } else if (data.type === 'thinking') {
+                setGenerationProgress(prev => ({
+                  ...prev,
+                  isThinking: true,
+                  thinkingText: (prev.thinkingText || '') + data.text
+                }));
+              } else if (data.type === 'thinking_complete') {
+                setGenerationProgress(prev => ({
+                  ...prev,
+                  isThinking: false,
+                  thinkingDuration: data.duration
+                }));
+              } else if (data.type === 'conversation') {
+                let text = data.text || '';
+                text = text.replace(/<package>[^<]*<\/package>/g, '');
+                text = text.replace(/<packages>[^<]*<\/packages>/g, '');
 
-                    const fileRegex = /<file path="([^"]+)">([^]*?)<\/file>/g;
-                    let match;
-                    const processedFiles = new Set(prev.files.map(f => f.path));
-
-                    while ((match = fileRegex.exec(newStreamedCode)) !== null) {
-                      const filePath = match[1];
-                      const fileContent = match[2];
-
-                      if (!processedFiles.has(filePath)) {
-                        const fileExt = filePath.split('.').pop() || '';
-                        const fileType = fileExt === 'jsx' || fileExt === 'js' ? 'javascript' :
-                          fileExt === 'css' ? 'css' :
-                            fileExt === 'json' ? 'json' :
-                              fileExt === 'html' ? 'html' : 'text';
-
-                        const existingFileIndex = updatedState.files.findIndex(f => f.path === filePath);
-
-                        if (existingFileIndex >= 0) {
-                          updatedState.files = [
-                            ...updatedState.files.slice(0, existingFileIndex),
-                            {
-                              ...updatedState.files[existingFileIndex],
-                              content: fileContent.trim(),
-                              type: fileType,
-                              completed: true,
-                              edited: true
-                            },
-                            ...updatedState.files.slice(existingFileIndex + 1)
-                          ];
-                        } else {
-                          updatedState.files = [...updatedState.files, {
-                            path: filePath,
-                            content: fileContent.trim(),
-                            type: fileType,
-                            completed: true,
-                            edited: false
-                          }];
-                        }
-
-                        updatedState.status = `Redesigned ${filePath}`;
-                        processedFiles.add(filePath);
-                      }
-                    }
-
-                    return updatedState;
-                  });
-                } else if (data.type === 'component') {
-                  setGenerationProgress(prev => ({
-                    ...prev,
-                    status: `Redesigned ${data.name}`,
-                    components: [...prev.components, {
-                      name: data.name,
-                      path: data.path,
-                      completed: true
-                    }],
-                    currentComponent: data.index
-                  }));
-                } else if (data.type === 'complete') {
-                  generatedCode = data.generatedCode;
-                  explanation = data.explanation;
-
-                  setConversationContext(prev => ({
-                    ...prev,
-                    lastGeneratedCode: generatedCode
-                  }));
-
-                  setGenerationProgress(prev => ({
-                    ...prev,
-                    isThinking: false,
-                    thinkingText: undefined,
-                    thinkingDuration: undefined
-                  }));
-
-                  if (data.packagesToInstall && data.packagesToInstall.length > 0) {
-                    console.log('[redesign] Packages to install:', data.packagesToInstall);
-                    (window).pendingPackages = data.packagesToInstall;
-                  }
-
-                  const fileRegex = /<file path="([^"]+)">([^]*?)<\/file>/g;
-                  const parsedFiles = [];
-                  let fileMatch;
-
-                  while ((fileMatch = fileRegex.exec(generatedCode)) !== null) {
-                    parsedFiles.push({
-                      path: fileMatch[1],
-                      content: fileMatch[2].trim()
-                    });
-                  }
-
-                  if (parsedFiles.length > 0) {
-                    console.log('[redesign] Applying generated code with', parsedFiles.length, 'files');
-                    await applyGeneratedCode(generatedCode, true);
-                    addChatMessage(`Successfully redesigned the website using intelligent schema! ${parsedFiles.length} files updated.`, 'system');
-                  } else {
-                    addChatMessage('Redesign completed but no files were generated. Please try again.', 'system');
-                  }
-
-                  if (explanation && explanation.trim()) {
-                    addChatMessage(explanation, 'ai');
-                  }
+                if (!text.includes('<file') && !text.includes('import React') &&
+                  !text.includes('export default') && !text.includes('className=') &&
+                  text.trim().length > 0) {
+                  addChatMessage(text.trim(), 'ai');
                 }
-              } catch (e) {
-                console.error('Error parsing streaming data:', e);
+              } else if (data.type === 'stream' && data.raw) {
+                // CRITICAL: Update streaming code display
+                setGenerationProgress(prev => {
+                  const newStreamedCode = prev.streamedCode + data.text;
+
+                  const updatedState = {
+                    ...prev,
+                    streamedCode: newStreamedCode,
+                    isStreaming: true,
+                    isThinking: false,
+                    status: 'Generating redesigned components...'
+                  };
+
+                  // Parse files from stream in real-time
+                  const fileRegex = /<file path="([^"]+)">([\s\S]*?)<\/file>/g;
+                  let match;
+                  const processedFiles = new Set(prev.files.map(f => f.path));
+
+                  while ((match = fileRegex.exec(newStreamedCode)) !== null) {
+                    const filePath = match[1];
+                    const fileContent = match[2];
+
+                    if (!processedFiles.has(filePath)) {
+                      const fileExt = filePath.split('.').pop() || '';
+                      const fileType = fileExt === 'jsx' || fileExt === 'js' ? 'javascript' :
+                        fileExt === 'css' ? 'css' :
+                          fileExt === 'json' ? 'json' :
+                            fileExt === 'html' ? 'html' : 'text';
+
+                      updatedState.files = [...updatedState.files, {
+                        path: filePath,
+                        content: fileContent.trim(),
+                        type: fileType,
+                        completed: true,
+                        edited: false
+                      }];
+
+                      updatedState.status = `Created ${filePath}`;
+                      processedFiles.add(filePath);
+                    }
+                  }
+
+                  // Handle current file being generated
+                  const lastFileMatch = newStreamedCode.match(/<file path="([^"]+)">([\s\S]*?)$/);
+                  if (lastFileMatch && !lastFileMatch[0].includes('</file>')) {
+                    const filePath = lastFileMatch[1];
+                    const partialContent = lastFileMatch[2];
+
+                    const fileExt = filePath.split('.').pop() || '';
+                    const fileType = fileExt === 'jsx' || fileExt === 'js' ? 'javascript' :
+                      fileExt === 'css' ? 'css' : 'text';
+
+                    updatedState.currentFile = {
+                      path: filePath,
+                      content: partialContent,
+                      type: fileType
+                    };
+                    updatedState.status = `Generating ${filePath}...`;
+                  } else {
+                    updatedState.currentFile = undefined;
+                  }
+
+                  return updatedState;
+                });
+              } else if (data.type === 'component') {
+                setGenerationProgress(prev => ({
+                  ...prev,
+                  status: `Created ${data.name}`,
+                  components: [...prev.components, {
+                    name: data.name,
+                    path: data.path,
+                    completed: true
+                  }],
+                  currentComponent: data.index
+                }));
+              } else if (data.type === 'complete') {
+                generatedCode = data.generatedCode;
+                explanation = data.explanation;
+
+                setConversationContext(prev => ({
+                  ...prev,
+                  lastGeneratedCode: generatedCode
+                }));
+
+                setGenerationProgress(prev => ({
+                  ...prev,
+                  isThinking: false,
+                  thinkingText: undefined,
+                  thinkingDuration: undefined,
+                  status: 'Code generation complete!'
+                }));
+
+                if (data.packagesToInstall && data.packagesToInstall.length > 0) {
+                  console.log('[redesign] Packages to install:', data.packagesToInstall);
+                  (window).pendingPackages = data.packagesToInstall;
+                }
               }
+            } catch (e) {
+              console.error('Error parsing streaming data:', e);
             }
           }
         }
       }
+    }
 
+    // Step 4: Apply the generated code (sandbox is already clear)
+    if (generatedCode) {
       setGenerationProgress(prev => ({
         ...prev,
-        isGenerating: false,
-        isStreaming: false,
-        status: 'Redesign complete!'
+        status: 'Applying redesigned components...'
       }));
 
-    } catch (error) {
-      console.error('Redesign error:', error);
-      addChatMessage(`Redesign failed: ${error.message}`, 'system');
-      setGenerationProgress(prev => ({
+      console.log('[redesign] Applying generated code with redesign=true (complete rebuild)');
+      
+      // Apply code with isRedesign=true for proper redesign handling
+      await applyGeneratedCode(generatedCode, false, true);
+      
+      addChatMessage('Successfully created completely new website design!', 'system');
+
+      if (explanation && explanation.trim()) {
+        addChatMessage(explanation, 'ai');
+      }
+
+      // Update conversation context
+      setConversationContext(prev => ({
         ...prev,
-        isGenerating: false,
-        isStreaming: false,
-        status: 'Redesign failed'
+        appliedCode: [...prev.appliedCode, {
+          files: [], // Will be updated by applyGeneratedCode
+          timestamp: new Date(),
+          type: 'redesign'
+        }]
       }));
     }
-  };
+
+    setGenerationProgress(prev => ({
+      ...prev,
+      isGenerating: false,
+      isStreaming: false,
+      status: 'Redesign complete!'
+    }));
+
+    // ENHANCED IFRAME REFRESH MECHANISM
+    const forceEnhancedIframeRefresh = () => {
+      if (iframeRef.current && sandboxData?.url) {
+        console.log('[Redesign Complete] Forcing enhanced iframe refresh...');
+        
+        // Update the refresh key to force complete re-render
+        setIframeRefreshKey(prev => prev + 1);
+        
+        // Create comprehensive cache-busting parameters
+        const refreshParams = new URLSearchParams({
+          t: Date.now().toString(),
+          v: (iframeRefreshKey + 1).toString(),
+          redesign: 'true',
+          cache: Date.now().toString(),
+          force: 'refresh',
+          update: Date.now().toString(),
+          bust: 'true'
+        });
+        
+        const newSrc = `${sandboxData.url}?${refreshParams.toString()}`;
+        iframeRef.current.src = newSrc;
+        console.log('[Redesign Complete] Enhanced iframe refresh with:', newSrc);
+        return true;
+      }
+      return false;
+    };
+
+    // Multiple refresh attempts with increasing delays
+    const attemptRefresh = (attempt = 1, maxAttempts = 5) => {
+      if (attempt > maxAttempts) {
+        console.warn('[Redesign Complete] Max refresh attempts reached');
+        return;
+      }
+      
+      if (!forceEnhancedIframeRefresh()) {
+        console.log(`[Redesign Complete] Refresh attempt ${attempt} failed, retrying...`);
+      setTimeout(() => {
+          attemptRefresh(attempt + 1, maxAttempts);
+        }, 500 * attempt); // Exponential backoff
+      }
+    };
+
+    // Start refresh attempts
+    attemptRefresh();
+
+    // Switch to preview after a delay
+    setTimeout(() => {
+      setActiveTab('preview');
+      // Force another refresh after switching to preview
+      setTimeout(() => {
+        attemptRefresh();
+      }, 500);
+    }, 2000);
+
+  } catch (error) {
+    console.error('Redesign error:', error);
+    addChatMessage(`Redesign failed: ${error.message}`, 'system');
+    setGenerationProgress(prev => ({
+      ...prev,
+      isGenerating: false,
+      isStreaming: false,
+      status: 'Redesign failed',
+      isThinking: false
+    }));
+  }
+};
 
   return (
     <div className="font-sans bg-background text-foreground h-screen flex flex-col">

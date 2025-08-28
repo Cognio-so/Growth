@@ -7,7 +7,21 @@ import { selectFilesForEdit, getFileContents, formatFilesForAI } from '../../../
 import { executeSearchPlan, formatSearchResultsForAI, selectTargetFile } from '../../../lib/file-search-executor';
 import { getUIPrinciplesPrompt } from '../../../lib/ui-principles';
 import appConfig from '../../../../config/app.config';
-import { getRandomDesignSchema, getDifferentRandomDesignSchema, getRedesignSchema, getRegenerateDesignSchema, getDesignSchemaByUrl, extractDesignPatterns, schemaToUIPrinciples, getSchemaCount, testSchemaParsing, getSchemaUsageStats } from '../../../lib/design-schema-utils';
+import { 
+  getRandomDesignSchema, 
+  getRegenerateDesignSchema, 
+  getRedesignSchema,
+  getFreshDesignSchema,
+  getSchemaCount, 
+  getSchemaUsageStats, 
+  testSchemaParsing, 
+  extractDesignPatterns, 
+  schemaToUIPrinciples,
+  resetSchemaTracking,
+  extractCompleteSchemaForAI,
+  getSchemaForAIPrompt,
+  getFormattedSchemaInstructions
+} from '../../../lib/design-schema-utils';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 const groq = createGroq({
@@ -76,6 +90,24 @@ export async function POST(request) {
     console.log('[generate-ai-code-stream] - isRedesign:', isRedesign);
     console.log('[generate-ai-code-stream] - isRegenerate:', isRegenerate);
 
+    // CRITICAL FIX: For redesign, clear the currentFiles to prevent preservation
+    if (isRedesign && context?.currentFiles) {
+      console.log('[generate-ai-code-stream] *** REDESIGN DETECTED - CLEARING currentFiles to prevent file preservation ***');
+      console.log('[generate-ai-code-stream] - Original file count:', Object.keys(context.currentFiles).length);
+      context.currentFiles = {};
+      console.log('[generate-ai-code-stream] - Files cleared, new count:', Object.keys(context.currentFiles).length);
+    }
+
+    // CRITICAL FIX: For redesign, also clear backend file cache context
+    if (isRedesign && global.sandboxState?.fileCache) {
+      console.log('[generate-ai-code-stream] *** REDESIGN DETECTED - CLEARING backend file cache context ***');
+      const originalCount = Object.keys(global.sandboxState.fileCache.files || {}).length;
+      global.sandboxState.fileCache.files = {};
+      global.sandboxState.fileCache.manifest = null;
+      console.log('[generate-ai-code-stream] - Original backend files:', originalCount, ', cleared to: 0');
+    }
+
+
     // UPDATED LOGIC: Intelligently select the best design schema based on user query
     let targetUrl = null;
     let designSchema = null;
@@ -84,31 +116,31 @@ export async function POST(request) {
 
     // STEP 1: Intelligently select the best design schema from SCHEMA.md based on user query
     console.log('[generate-ai-code-stream] 🔍 Intelligently selecting best design schema from SCHEMA.md...');
-    
+
     // Test schema parsing first
     const schemaTest = testSchemaParsing();
     console.log('[generate-ai-code-stream] Schema Test Result:', schemaTest);
-    
+
     if (schemaTest.success && schemaTest.totalSchemas > 0) {
       const userRequest = extractUserRequest(prompt);
       console.log('[generate-ai-code-stream] Extracted user request:', userRequest);
-      
+
       // Get schema usage statistics
       const usageStats = getSchemaUsageStats();
       console.log('[generate-ai-code-stream] Schema usage stats:', usageStats);
-      
+
       // SCENARIO 1: User provided URL - choose schema and scrape content
       if (userProvidedUrl && userProvidedUrl.startsWith('http')) {
         console.log('[generate-ai-code-stream] 🎯 SCENARIO 1: User provided URL - choosing schema and scraping content');
-        
+
         // Choose a random schema for design patterns
         designSchema = getRandomDesignSchema();
-        
+
         if (designSchema && designSchema.schema) {
           schemaData = designSchema.schema;
           targetUrl = userProvidedUrl;
           shouldScrape = true;
-          
+
           console.log('[generate-ai-code-stream] ✅ SCHEMA SELECTED FOR URL SCENARIO:');
           console.log('[generate-ai-code-stream] - Schema URL:', designSchema.url);
           console.log('[generate-ai-code-stream] - Schema ID:', designSchema.id);
@@ -118,47 +150,56 @@ export async function POST(request) {
       }
       // SCENARIO 2: Regenerate request - choose different schema and create new design
       else if (isRegenerate) {
-        console.log('[generate-ai-code-stream] 🔄 SCENARIO 2: Regenerate request - choosing different schema for new design');
-        
-        // Get a completely new schema (excluding all previously used)
+        console.log('[generate-ai-code-stream] REGENERATE MODE: Choosing new schema for fresh design');
+
+        // Get a completely new schema (excluding all previously used in regenerate mode)
         designSchema = getRegenerateDesignSchema();
-        
+
         if (designSchema && designSchema.schema) {
           schemaData = designSchema.schema;
-          
-          console.log('[generate-ai-code-stream] ✅ NEW SCHEMA SELECTED FOR REGENERATE:');
+
+          console.log('[generate-ai-code-stream] NEW SCHEMA SELECTED FOR REGENERATE:');
           console.log('[generate-ai-code-stream] - Schema URL:', designSchema.url);
           console.log('[generate-ai-code-stream] - Schema ID:', designSchema.id);
           console.log('[generate-ai-code-stream] - Total schemas available:', getSchemaCount());
-          console.log('[generate-ai-code-stream] - Schemas used so far:', usageStats.used);
           console.log('[generate-ai-code-stream] - Will create new design using schema patterns only');
         }
       }
-      // SCENARIO 3: Normal request (no URL, no regenerate) - choose random schema
-      else {
-        console.log('[generate-ai-code-stream] SCENARIO 3: Normal request - choosing random schema for design');
+      // SCENARIO 3: Redesign request - choose completely different schema
+      else if (isRedesign) {
+        console.log('[generate-ai-code-stream] REDESIGN MODE: Selecting fresh schema for complete redesign');
         
-        // Use different schema selection for redesigns
-        if (isRedesign) {
-          console.log('[generate-ai-code-stream] 🎨 REDESIGN MODE: Selecting different schema to avoid repetition');
+        // Use redesign-specific function that excludes all previously used schemas
           designSchema = getRedesignSchema();
-        } else {
-          // Use intelligent schema selection for new generations
-          designSchema = getRandomDesignSchema();
-        }
         
         if (designSchema && designSchema.schema) {
           schemaData = designSchema.schema;
           
-          console.log('[generate-ai-code-stream] ✅ SCHEMA SELECTED FOR NORMAL REQUEST:');
+          console.log('[generate-ai-code-stream] FRESH SCHEMA SELECTED FOR REDESIGN:');
           console.log('[generate-ai-code-stream] - Schema URL:', designSchema.url);
           console.log('[generate-ai-code-stream] - Schema ID:', designSchema.id);
           console.log('[generate-ai-code-stream] - Total schemas available:', getSchemaCount());
-          console.log('[generate-ai-code-stream] - Schemas used so far:', usageStats.used);
+          console.log('[generate-ai-code-stream] - Will create completely new design using fresh schema');
+        }
+      }
+      // SCENARIO 4: Normal request (no URL, no regenerate, no redesign) - choose random schema
+      else {
+        console.log('[generate-ai-code-stream] NORMAL MODE: Choosing random schema for design');
+        
+        // Use normal random selection
+        designSchema = getRandomDesignSchema();
+
+        if (designSchema && designSchema.schema) {
+          schemaData = designSchema.schema;
+
+          console.log('[generate-ai-code-stream] SCHEMA SELECTED FOR NORMAL REQUEST:');
+          console.log('[generate-ai-code-stream] - Schema URL:', designSchema.url);
+          console.log('[generate-ai-code-stream] - Schema ID:', designSchema.id);
+          console.log('[generate-ai-code-stream] - Total schemas available:', getSchemaCount());
           console.log('[generate-ai-code-stream] - Will create design using schema patterns only');
         }
       }
-      
+
       if (designSchema && designSchema.schema) {
         // Extract design patterns for better implementation guidance
         const designPatterns = extractDesignPatterns(designSchema);
@@ -174,11 +215,11 @@ export async function POST(request) {
     let scrapedContent = null;
     let screenshot = null;
     let businessInfo = null;
-    
+
     if (targetUrl && shouldScrape) {
       try {
         console.log('[generate-ai-code-stream] Scraping URL for content:', targetUrl);
-        
+
         // Scrape the URL content
         const scrapeResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/scrape-url-enhanced`, {
           method: 'POST',
@@ -193,7 +234,7 @@ export async function POST(request) {
             businessInfo = scrapeData.structured?.businessInfo;
             console.log('[generate-ai-code-stream] Successfully scraped content from:', targetUrl);
             console.log('[generate-ai-code-stream] Content length:', scrapedContent.length);
-            
+
             if (businessInfo) {
               console.log('[generate-ai-code-stream] Business info extracted:', businessInfo);
             }
@@ -257,8 +298,8 @@ export async function POST(request) {
       metadata: {
         sandboxId: context?.sandboxId,
         targetUrl: targetUrl,
-        designSchema: designSchema ? { 
-          id: designSchema.id, 
+        designSchema: designSchema ? {
+          id: designSchema.id,
           url: designSchema.url,
           scrapedContent: scrapedContent ? true : false,
           screenshot: screenshot ? true : false,
@@ -633,121 +674,147 @@ ${context.documentDesignPrompt}
         // UPDATED SYSTEM PROMPT: Always prioritize schema data, then scraped content
         let schemaContext = '';
         if (schemaData) {
-          const designPatterns = extractDesignPatterns(designSchema);
+          console.log('[generate-ai-code-stream] Extracting comprehensive schema data for AI...');
+
+          // Get complete schema extraction
+          const completeSchema = extractCompleteSchemaForAI(designSchema);
+          const formattedInstructions = getFormattedSchemaInstructions(designSchema);
           
+          if (completeSchema) {
           schemaContext = `
 
-## 🎯 PRIMARY DESIGN GUIDE: SCHEMA DATA
+## 🎯 COMPREHENSIVE DESIGN SCHEMA IMPLEMENTATION
 
 **CRITICAL: This schema is your PRIMARY design blueprint. Follow it exactly for UI/UX design.**
 
-### 🎨 Design Source: ${designSchema?.url || 'Random Schema'}
-### 📊 Schema ID: ${designSchema?.id || 'N/A'}
-### 📈 Total Schemas Available: ${getSchemaCount()}
-### 🎯 Scenario: ${userProvidedUrl ? 'URL_PROVIDED - Using schema design + scraped content' : isRegenerate ? 'REGENERATE - New schema design only' : 'NORMAL_REQUEST - Schema design only'}
+###  Schema Information:
+- **Schema ID:** ${completeSchema.metadata.schemaId}
+- **Source URL:** ${completeSchema.metadata.sourceUrl}
+- **Total Components:** ${completeSchema.metadata.totalComponents}
+- **Extraction Time:** ${completeSchema.metadata.extractionTimestamp}
+- **Scenario:** ${userProvidedUrl ? 'URL_PROVIDED - Using schema design + scraped content' : isRegenerate ? 'REGENERATE - New schema design only' : 'NORMAL_REQUEST - Schema design only'}
 
-**IMPLEMENTATION PRIORITY:**
-1. Schema Design Data (PRIMARY - USE THIS FIRST)
-2. Scraped Content (SECONDARY - for content only, if URL provided)
-3. UI Principles (FALLBACK - general guidelines)
+### 🎨 COMPLETE SCHEMA DATA:
+${JSON.stringify(completeSchema, null, 2)}
 
-${JSON.stringify(schemaData, null, 2)}
+### 📋 FORMATTED IMPLEMENTATION INSTRUCTIONS:
+${formattedInstructions}
 
-### 🧩 COMPONENT-BY-COMPONENT IMPLEMENTATION GUIDE:
+### 🧩 COMPONENT-BY-COMPONENT IMPLEMENTATION:
 
 ${(() => {
-  if (!schemaData) return '';
-  
-  let instructions = '';
-  
-  // Extract component specifications
-  if (schemaData.components) {
-    instructions += `\n### COMPONENT SPECIFICATIONS:\n`;
-    for (const [componentName, component] of Object.entries(schemaData.components)) {
-      instructions += `\n**${componentName} Component:**\n`;
-      instructions += `- **Type:** ${component.type}\n`;
-      instructions += `- **Description:** ${component.description}\n`;
-      
-      if (component.typography) {
-        instructions += `- **Typography Requirements:**\n`;
-        for (const [element, typography] of Object.entries(component.typography)) {
-          instructions += `  - ${element}: ${typography.visual_description || typography.weight || 'default'}\n`;
-        }
-      }
-      
-      if (component.spacing) {
-        instructions += `- **Spacing:** Padding: ${component.spacing.padding || 'default'}, Margin: ${component.spacing.margin || 'default'}\n`;
-      }
-      
-      if (component.colors) {
-        instructions += `- **Color Scheme:**\n`;
-        instructions += `  - Background: ${component.colors.background}\n`;
-        instructions += `  - Text: ${component.colors.text}\n`;
-        instructions += `  - Accent: ${component.colors.accent}\n`;
-      }
-      
-      if (component.image_style) {
-        instructions += `- **Image Style:** ${component.image_style}\n`;
-      }
-      
-      if (component.other_visual_notes) {
-        instructions += `- **Visual Notes:** ${component.other_visual_notes}\n`;
-      }
-    }
-  }
-  
-  // Extract page structure
-  if (schemaData.page_structure) {
-    instructions += `\n### 📄 PAGE STRUCTURE (IMPLEMENT IN THIS EXACT ORDER):\n`;
-    schemaData.page_structure.forEach((item, index) => {
-      instructions += `${index + 1}. **${item.component}** - ${item.description || 'Component to be implemented'}\n`;
-    });
-  }
-  
-  // Extract design system
-  if (schemaData.design_system) {
-    instructions += `\n### 🎨 DESIGN SYSTEM:\n`;
-    instructions += JSON.stringify(schemaData.design_system, null, 2);
-  }
-  
-  // Extract layout guidelines
-  if (schemaData.layout_guidelines) {
-    instructions += `\n### 📐 LAYOUT GUIDELINES:\n`;
-    instructions += JSON.stringify(schemaData.layout_guidelines, null, 2);
-  }
-  
-  return instructions;
-})()}
+              if (!completeSchema.components) return '';
 
-###  DESIGN PATTERNS EXTRACTED:
+              let componentGuide = '';
+              for (const [componentName, component] of Object.entries(completeSchema.components)) {
+                componentGuide += `\n**${componentName} Component:**\n`;
+                componentGuide += `- **Type:** ${component.type}\n`;
+                componentGuide += `- **Description:** ${component.description}\n`;
+                componentGuide += `- **CSS Classes:** ${component.cssClasses.join(', ')}\n`;
+                componentGuide += `- **HTML Structure:**\n\`\`\`html\n${component.htmlStructure}\n\`\`\`\n`;
+                componentGuide += `- **React Component:**\n\`\`\`jsx\n${component.reactComponent}\n\`\`\`\n`;
+                componentGuide += `- **Styling:**\n\`\`\`css\n${JSON.stringify(component.styling, null, 2)}\n\`\`\`\n`;
+                
+                if (component.implementation.typography && Object.keys(component.implementation.typography).length > 0) {
+                  componentGuide += `- **Typography Implementation:**\n`;
+                  for (const [element, typography] of Object.entries(component.implementation.typography)) {
+                    componentGuide += `  - ${element}: ${JSON.stringify(typography, null, 2)}\n`;
+                  }
+                }
+                
+                if (component.implementation.colors) {
+                  componentGuide += `- **Color Implementation:** ${JSON.stringify(component.implementation.colors, null, 2)}\n`;
+                }
+                
+                if (component.implementation.spacing) {
+                  componentGuide += `- **Spacing Implementation:** ${JSON.stringify(component.implementation.spacing, null, 2)}\n`;
+                }
+                
+                if (component.implementation.images && component.implementation.images.style) {
+                  componentGuide += `- **Image Implementation:** ${JSON.stringify(component.implementation.images, null, 2)}\n`;
+                }
+              }
+              return componentGuide;
+            })()}
+
+###  DESIGN SYSTEM EXTRACTION:
 ${(() => {
-  if (!designPatterns) return 'No design patterns found';
-  
-  let patterns = '';
-  if (designPatterns.colorPalette) {
-    patterns += `\n**Color Palette:**\n`;
-    for (const [component, colors] of Object.entries(designPatterns.colorPalette)) {
-      patterns += `- ${component}: ${JSON.stringify(colors)}\n`;
-    }
-  }
-  
-  if (designPatterns.typography) {
-    patterns += `\n**Typography:**\n`;
-    for (const [component, typography] of Object.entries(designPatterns.typography)) {
-      patterns += `- ${component}: ${JSON.stringify(typography)}\n`;
-    }
-  }
-  
-  return patterns;
-})()}
+              if (!completeSchema.designSystem || Object.keys(completeSchema.designSystem).length === 0) {
+                return 'No design system data available';
+              }
+              return JSON.stringify(completeSchema.designSystem, null, 2);
+            })()}
+
+### 🌈 COLOR PALETTE SYSTEM:
+${(() => {
+              if (!completeSchema.colorPalette || Object.keys(completeSchema.colorPalette).length === 0) {
+                return 'No color palette data available';
+              }
+              return JSON.stringify(completeSchema.colorPalette, null, 2);
+            })()}
+
+### 📝 TYPOGRAPHY SYSTEM:
+${(() => {
+              if (!completeSchema.typographySystem || Object.keys(completeSchema.typographySystem).length === 0) {
+                return 'No typography system data available';
+              }
+              return JSON.stringify(completeSchema.typographySystem, null, 2);
+            })()}
+
+###  SPACING SYSTEM:
+${(() => {
+              if (!completeSchema.spacingSystem || Object.keys(completeSchema.spacingSystem).length === 0) {
+                return 'No spacing system data available';
+              }
+              return JSON.stringify(completeSchema.spacingSystem, null, 2);
+            })()}
+
+### 🎯 CSS VARIABLES:
+${(() => {
+              if (!completeSchema.cssVariables || Object.keys(completeSchema.cssVariables).length === 0) {
+                return 'No CSS variables available';
+              }
+              let cssVars = '';
+              for (const [variable, value] of Object.entries(completeSchema.cssVariables)) {
+                cssVars += `${variable}: ${value};\n`;
+              }
+              return cssVars;
+            })()}
+
+### 📋 IMPLEMENTATION CHECKLIST:
+1. **✅ Extract all component specifications from the schema**
+2. **✅ Follow the exact page structure order**
+3. **✅ Implement typography according to the system**
+4. **✅ Apply color palette consistently**
+5. **✅ Use spacing system for layout**
+6. **✅ Generate CSS variables for theming**
+7. **✅ Create React components with proper structure**
+8. **✅ Apply styling according to component specifications**
+9. **✅ Ensure responsive design compatibility**
+10. **✅ Test component interactions and animations**
 
 **CRITICAL INSTRUCTIONS:**
-1. **ALWAYS** implement the components exactly as specified in the schema
-2. **FOLLOW** the color schemes, typography, and spacing guidelines precisely
-3. **USE** the page structure order for component implementation
-4. **APPLY** the design patterns consistently across all components
-5. **PRIORITIZE** the schema over any other design guidance`;
+- **ALWAYS** implement the components exactly as specified in the schema
+- **FOLLOW** the color schemes, typography, and spacing guidelines precisely
+- **USE** the page structure order for component implementation
+- **APPLY** the design patterns consistently across all components
+- **PRIORITIZE** the schema over any other design guidance
+- **GENERATE** clean, semantic HTML and CSS
+- **CREATE** reusable React components with proper props
+- **ENSURE** accessibility standards are met
+- **IMPLEMENT** responsive design patterns
+- **USE** modern CSS features and best practices`;
 
+            console.log('[generate-ai-code-stream] ✅ Comprehensive schema extraction completed');
+            console.log(`[generate-ai-code-stream] - Components extracted: ${Object.keys(completeSchema.components).length}`);
+            console.log(`[generate-ai-code-stream] - Page structure items: ${completeSchema.pageStructure.length}`);
+            console.log(`[generate-ai-code-stream] - CSS variables generated: ${Object.keys(completeSchema.cssVariables).length}`);
+          } else {
+            console.warn('[generate-ai-code-stream] Failed to extract complete schema, falling back to basic extraction');
+            // Fallback to basic extraction
+            const designPatterns = extractDesignPatterns(designSchema);
+            schemaContext = `\n## 🎯 BASIC DESIGN SCHEMA\n\n${JSON.stringify(schemaData, null, 2)}\n\n### Design Patterns:\n${JSON.stringify(designPatterns, null, 2)}`;
+          }
         }
 
         // Add scraped content context if available (SECONDARY to schema data)
@@ -794,71 +861,31 @@ ${scrapedContent}
 - Component-based architecture
 - Create complete, functional components
 
-${schemaData ? `🎯 **PRIMARY DESIGN SOURCE: ${isRegenerate ? 'NEW ' : isRedesign ? 'DIFFERENT ' : ''}INTELLIGENTLY SELECTED SCHEMA**
+${isRedesign ? `
+🚨 **CRITICAL REDESIGN MODE INSTRUCTIONS - OVERRIDE ALL OTHER RULES:**
 
-**CRITICAL INSTRUCTIONS:**
-1. **USE ${isRegenerate ? 'NEW ' : isRedesign ? 'DIFFERENT ' : ''}INTELLIGENTLY SELECTED SCHEMA** - This schema was chosen based on your specific request${isRegenerate ? ' and is completely new' : isRedesign ? ' and is different from the previous one' : ''}
-2. **IMPLEMENT EXACT COMPONENT SPECIFICATIONS** - Follow the component definitions precisely
-3. **FOLLOW PAGE STRUCTURE ORDER** - Implement components in the exact order specified
-4. **APPLY EXACT COLORS AND TYPOGRAPHY** - Use the specified color schemes and typography
-5. **MAINTAIN VISUAL HIERARCHY** - Follow the visual hierarchy as described in the schema
-${isRegenerate ? '6. **REGENERATE MODE** - This is a regenerate request. Create a completely new design using the new schema' : isRedesign ? '6. **REDESIGN MODE** - This is a redesign request. Apply the different schema design to the existing content structure' : ''}
+**YOU ARE CREATING A COMPLETELY NEW WEBSITE FROM SCRATCH**
+- All existing files have been DELETED from the sandbox
+- You must create EVERY file from the beginning
+- Do NOT reference ANY existing components or files
+- Create a completely NEW design architecture
+- Use the selected design schema to build entirely fresh components
+- Generate ALL necessary files (App.jsx, main.jsx, components, etc.)
+- This is NOT an edit - this is a complete rebuild
 
-**SELECTED SCHEMA ANALYSIS:**
-- **Source URL:** ${designSchema?.url || 'Unknown'}
-- **Schema ID:** ${designSchema?.id || 'N/A'}
-- **Selection Method:** ${designSchema?.queryAnalysis?.method || 'unknown'}
-- **Matched Keywords:** ${designSchema?.queryAnalysis?.matchedKeywords?.join(', ') || 'none'}
-- **Matched Categories:** ${designSchema?.queryAnalysis?.matchedCategories?.join(', ') || 'none'}
-${isRedesign ? `- **Previous Schema Excluded:** ${designSchema?.queryAnalysis?.excludedIds?.join(', ') || 'none'}` : ''}
+**REDESIGN CHECKLIST:**
+- [ ] Create completely new App.jsx with new structure
+- [ ] Create all new components with different designs
+- [ ] Generate new main.jsx entry point if needed  
+- [ ] Create new index.css with fresh styles
+- [ ] Build entirely new component hierarchy
+- [ ] Use different layout patterns and UI approach
+- [ ] Apply completely new visual design language
 
-**IMPLEMENTATION PRIORITY:**
-1. ${isRegenerate ? 'New ' : isRedesign ? 'Different ' : ''}Intelligently Selected Schema (PRIMARY - chosen based on your request${isRegenerate ? ' and completely new' : isRedesign ? ' and different from previous' : ''})
-2. Scraped Content (SECONDARY - provides real content/text, if URL provided)
-3. UI/UX Principles (GENERAL GUIDELINES)` : ''}
+**CRITICAL:** Ignore any references to existing files. The sandbox is empty.
+` : ''}
 
-${isRegenerate ? `## 🔄 REGENERATE MODE - USING NEW INTELLIGENTLY SELECTED SCHEMA
-
-**🚨 CRITICAL REGENERATION INSTRUCTIONS - OVERRIDE ALL OTHER RULES:**
-- You are creating a COMPLETELY NEW website with COMPLETELY NEW structure and layout
-- This is NOT just a theme change - this is a complete regeneration from scratch
-- The new schema provides a completely different design system and layout approach
-- IGNORE all existing files and create everything fresh
-- Create NEW component architecture, NEW layout patterns, NEW user flow
-- Generate NEW content that matches the new schema theme
-- Build NEW responsive design patterns and interactions
-
-**WHAT TO REGENERATE (NOT JUST THEME):**
-1. **NEW Component Structure** - Different component hierarchy and relationships
-2. **NEW Layout Patterns** - Different page structure and arrangement
-3. **NEW Navigation Flow** - Different navigation structure and user experience
-4. **NEW Content Sections** - Different content organization and flow
-5. **NEW Visual Hierarchy** - Different visual organization and emphasis
-6. **NEW Responsive Design** - Different responsive patterns and breakpoints
-7. **NEW Interactions** - Different animations and user interactions
-8. **NEW Content** - Fresh content that matches the new schema theme
-
-**REGENERATION PROCESS:**
-1. Analyze the NEW schema's design system and layout approach
-2. Create completely new component structure based on schema
-3. Implement new layout patterns and page flow
-4. Generate fresh content matching the schema theme
-5. Build new responsive design patterns
-6. Add new animations and interactions
-7. Ensure no reference to previous design patterns
-
-**New Intelligently Selected Schema:** ${designSchema?.url || 'Unknown'}
-**Schema ID:** ${designSchema?.id || 'N/A'}
-**Selection Reason:** ${designSchema?.queryAnalysis?.matchedKeywords?.join(', ') || 'Best new match for your request'}
-**Previous Schemas Excluded:** All previously used schemas excluded
-**Mode:** COMPLETE REGENERATION (not theme change)` : ''}
-
-${targetUrl ? `TARGET WEBSITE: ${targetUrl}
-${scrapedContent ? 'You are recreating this website using intelligently selected schema design for layout and real content for text.' : 'You are creating a website inspired by this URL.'}` : ''}
-
-${conversationContext}
-
-${schemaContext}
+${schemaData ? `${schemaContext}` : ''}
 
 ${scrapedContext}
 
@@ -871,69 +898,28 @@ ${getUIPrinciplesPrompt()}
 **CRITICAL RULES - YOUR MOST IMPORTANT INSTRUCTIONS:**
 
 ${isRedesign ? `
- **REDESIGN MODE - OVERRIDE ALL OTHER RULES**
-**YOU ARE CREATING A COMPLETELY NEW WEBSITE FROM SCRATCH**
+ **REDESIGN MODE CRITICAL REQUIREMENTS - COMPLETE REBUILD:**
+- You MUST generate complete files with the NEW design system
+- Do not just describe changes - CREATE THE ACTUAL CODE
+- Apply the DIFFERENT intelligently selected schema design to create NEW components
+- **DISCARD ALL EXISTING CONTENT AND FUNCTIONALITY** - create completely new content
+- **CREATE NEW LAYOUT STRUCTURE** - different page organization and flow
+- **GENERATE NEW COMPONENT ARCHITECTURE** - different component hierarchy
+- **BUILD NEW NAVIGATION PATTERNS** - different user experience flow
+- **CREATE NEW VISUAL DESIGN** - different colors, typography, spacing, layout
+- Generate ALL necessary files with the completely new design system
+- This schema is DIFFERENT from the previous one used
+- **THIS IS A COMPLETE REBUILD, NOT A THEME CHANGE**
 
-**REDESIGN OVERRIDE RULES:**
-1. **IGNORE ALL EXISTING FILES** - Do NOT check App.jsx or any existing files
-2. **CREATE COMPLETE NEW STRUCTURE** - Build everything from scratch using the different schema
-3. **NO FILE COUNT LIMITS** - Create ALL necessary files for the new design
-4. **COMPLETE LAYOUT RESTRUCTURE** - Change the entire page structure, not just colors
-5. **NEW COMPONENT ARCHITECTURE** - Create new component relationships and hierarchy
-6. **FRESH CONTENT AND DESIGN** - Generate new content that matches the schema theme
-7. **IGNORE PREVIOUS DESIGNS** - Do not reference or preserve any existing design patterns
+🚨 **MANDATORY REDESIGN FILE GENERATION:**
+You MUST create these files for a complete redesign:
+1. **src/App.jsx** - Main app component with new structure
+2. **src/main.jsx** - Entry point (if needed)
+3. **src/index.css** - Base styles with Tailwind
+4. **src/components/** - All new components with different designs
+5. Any additional files needed for the new architecture
 
-**WHAT TO REDESIGN:**
-- Complete new Header with different navigation structure
-- New Hero section with different layout and content
-- New content sections with different arrangement
-- New Footer with different structure
-- New overall page flow and user experience
-- New component hierarchy and relationships
-- New responsive design patterns
-- New animations and interactions
-
-**REDESIGN CHECKLIST:**
-- [ ] Create completely new component structure
-- [ ] Implement new layout patterns from schema
-- [ ] Generate fresh content matching schema theme
-- [ ] Build new navigation and user flow
-- [ ] Create new visual hierarchy
-- [ ] Implement new responsive breakpoints
-- [ ] Add new animations and interactions
-- [ ] Ensure no reference to previous design
-` : isRegenerate ? `
- **REGENERATION MODE - OVERRIDE ALL OTHER RULES**
-**YOU ARE CREATING A COMPLETELY NEW WEBSITE FROM SCRATCH**
-
-**REGENERATION OVERRIDE RULES:**
-1. **IGNORE ALL EXISTING FILES** - Do NOT check App.jsx or any existing files
-2. **CREATE COMPLETE NEW STRUCTURE** - Build everything from scratch using the new schema
-3. **NO FILE COUNT LIMITS** - Create ALL necessary files for the new design
-4. **COMPLETE LAYOUT RESTRUCTURE** - Change the entire page structure, not just colors
-5. **NEW COMPONENT ARCHITECTURE** - Create new component relationships and hierarchy
-6. **FRESH CONTENT AND DESIGN** - Generate new content that matches the schema theme
-7. **IGNORE PREVIOUS DESIGNS** - Do not reference or preserve any existing design patterns
-
-**WHAT TO REGENERATE:**
-- Complete new Header with different navigation structure
-- New Hero section with different layout and content
-- New content sections with different arrangement
-- New Footer with different structure
-- New overall page flow and user experience
-- New component hierarchy and relationships
-- New responsive design patterns
-- New animations and interactions
-
-**REGENERATION CHECKLIST:**
-- [ ] Create completely new component structure
-- [ ] Implement new layout patterns from schema
-- [ ] Generate fresh content matching schema theme
-- [ ] Build new navigation and user flow
-- [ ] Create new visual hierarchy
-- [ ] Implement new responsive breakpoints
-- [ ] Add new animations and interactions
-- [ ] Ensure no reference to previous design
+**DO NOT assume ANY files exist - create EVERYTHING from scratch**
 ` : `
 1. **DO EXACTLY WHAT IS ASKED - NOTHING MORE, NOTHING LESS**
    - Don't add features not requested
@@ -948,12 +934,6 @@ ${isRedesign ? `
    - Simple style/text change = 1 file ONLY
    - New component = 2 files MAX (component + parent)
    - If >3 files, YOU'RE DOING TOO MUCH
-
-COMPONENT RELATIONSHIPS (CHECK THESE FIRST):
-- Navigation usually lives INSIDE Header.jsx, not separate Nav.jsx
-- Logo is typically in Header, not standalone
-- Footer often contains nav links already
-- Menu/Hamburger is part of Header, not separate
 `}
 
 PACKAGE USAGE RULES:
@@ -961,6 +941,21 @@ PACKAGE USAGE RULES:
 - For simple nav links in a single-page app, use scroll-to-section or href="#"
 - Only add routing if building a multi-page application
 - Common packages are auto-installed from your imports
+- **CRITICAL: ALWAYS use inline SVG icons instead of importing from packages**
+- **NEVER import from lucide-react, react-icons, or any icon packages**
+- **Use inline SVG icons with proper accessibility attributes**
+- **Example SVG icon format:**
+  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+    <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+    <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+  </svg>
+- **Common icons to use as SVG:**
+  - Email: envelope icon
+  - Phone: phone icon  
+  - Location: map-pin icon
+  - Social media: appropriate platform icons
+  - Navigation: hamburger menu, close, arrow icons
+- **ALWAYS include <package> tags for any external packages you import**
 
 ${isRegenerate ? `
 🔄 **REGENERATION WEBSITE REQUIREMENTS:**
@@ -1152,7 +1147,26 @@ ${isRegenerate ? `
           }
 
           // Include current file contents from backend cache
-          if (hasBackendFiles && !isRegenerate && !isRedesign) {
+          // CRITICAL: For redesign, we NEVER include existing files
+          if (isRedesign || isRegenerate) {
+            console.log('[generate-ai-code-stream] REDESIGN/REGENERATE MODE - NOT including any existing files');
+            contextParts.push('\n COMPLETE REDESIGN/REGENERATION - CREATE ALL NEW FILES 🚨');
+            contextParts.push('MANDATORY INSTRUCTIONS:');
+            contextParts.push('1. CREATE a completely NEW website from scratch');
+            contextParts.push('2. DO NOT reuse ANY existing code, components, or patterns');
+            contextParts.push('3. Use ONLY the new design schema for styling');
+            contextParts.push('4. Generate ALL files as if starting a brand new project');
+            contextParts.push('5. If you see any existing files mentioned, IGNORE THEM COMPLETELY');
+            contextParts.push('6. The sandbox has been CLEARED - no files exist');
+            contextParts.push('\n✅ Success = All new files with fresh design');
+            contextParts.push('❌ Failure = Any reuse of existing code');
+            contextParts.push('\n🎯 **REQUIRED FILES FOR REDESIGN:**');
+            contextParts.push('- src/App.jsx (main application component)');
+            contextParts.push('- src/main.jsx (entry point if needed)');
+            contextParts.push('- src/index.css (base styles with Tailwind)');
+            contextParts.push('- src/components/* (all UI components)');
+            contextParts.push('\n⚠️ Remember: The sandbox is EMPTY. Create EVERYTHING.');
+          } else if (hasBackendFiles && !isRegenerate && !isRedesign) {
             // If we have edit context, use intelligent file selection
             if (editContext && editContext.primaryFiles.length > 0) {
               contextParts.push('\nEXISTING APPLICATION - TARGETED EDIT MODE');
@@ -1330,6 +1344,9 @@ ${isRegenerate ? `
 4. NEVER leave incomplete class names or attributes
 5. ALWAYS close ALL tags, quotes, brackets, and parentheses
 6. If you run out of space, prioritize completing the current file
+7. **ALWAYS use inline SVG icons - NEVER import from icon packages**
+8. **NEVER use: import { ... } from "lucide-react" or "react-icons"**
+9. **ALWAYS include <package> tags for any external packages you import**
 
 CRITICAL STRING RULES TO PREVENT SYNTAX ERRORS:
 - NEVER write: className="px-8 py-4 bg-black text-white font-bold neobrut-border neobr...
@@ -1865,7 +1882,7 @@ Provide the complete file content without any truncation. Include all necessary 
 function extractUserRequest(prompt) {
   // Remove common prefixes and extract the core request
   let userRequest = prompt;
-  
+
   // Remove common AI instruction prefixes
   const prefixesToRemove = [
     'Create a modern, professional website based on this description:',
@@ -1883,14 +1900,14 @@ function extractUserRequest(prompt) {
     'Make sure the app actually renders visible content',
     'Create ALL components that you reference in imports'
   ];
-  
+
   for (const prefix of prefixesToRemove) {
     userRequest = userRequest.replace(prefix, '').trim();
   }
-  
+
   // Remove quotes and extra whitespace
   userRequest = userRequest.replace(/^["']|["']$/g, '').trim();
-  
+
   // If the request is still very long, take just the first sentence
   if (userRequest.length > 200) {
     const firstSentence = userRequest.split(/[.!?]/)[0];
@@ -1898,6 +1915,6 @@ function extractUserRequest(prompt) {
       userRequest = firstSentence.trim();
     }
   }
-  
+
   return userRequest || 'website';
 }
