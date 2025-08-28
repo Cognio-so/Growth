@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { parseDesignSchemas, debugSchemaStructure } from '../../../lib/design-schema-utils';
+import { parseDesignSchemas, getSchemaUsageStats } from '../../../lib/design-schema-utils';
 
 export async function POST() {
   try {
     console.log('[test-csv-parsing] Starting CSV analysis...');
     
     // Debug schema structure
-    const csvDebug = debugSchemaStructure();
+    const csvDebug = getSchemaUsageStats();
     
     // Parse schemas
     const schemas = parseDesignSchemas();
